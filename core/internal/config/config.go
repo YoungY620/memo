@@ -8,35 +8,35 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config 是项目的主配置结构
+// Config is the main configuration structure
 type Config struct {
 	Watcher WatcherConfig `yaml:"watcher"`
 	Trigger TriggerConfig `yaml:"trigger"`
 	Index   IndexConfig   `yaml:"index"`
 }
 
-// WatcherConfig 文件监控配置
+// WatcherConfig file monitoring configuration
 type WatcherConfig struct {
-	Root       string   `yaml:"root"`       // 监控根目录
-	Ignore     []string `yaml:"ignore"`     // 忽略的目录/文件 (glob 模式)
-	Extensions []string `yaml:"extensions"` // 监控的文件扩展名
+	Root       string   `yaml:"root"`       // Root directory to monitor
+	Ignore     []string `yaml:"ignore"`     // Directories/files to ignore (glob patterns)
+	Extensions []string `yaml:"extensions"` // File extensions to monitor
 }
 
-// TriggerConfig 触发管理配置
+// TriggerConfig trigger management configuration
 type TriggerConfig struct {
-	MinFiles int `yaml:"minFiles"` // 变更文件数阈值
-	IdleMs   int `yaml:"idleMs"`   // 空闲超时 (毫秒)
+	MinFiles int `yaml:"minFiles"` // Minimum file change count threshold
+	IdleMs   int `yaml:"idleMs"`   // Idle timeout in milliseconds
 }
 
-// IndexConfig 索引配置
+// IndexConfig index configuration
 type IndexConfig struct {
-	Path     string `yaml:"path"`     // 索引输出目录
-	MaxNotes int    `yaml:"maxNotes"` // flash-notes 最大条数
-	MaxTags  int    `yaml:"maxTags"`  // tag 最大个数
-	MaxTypes int    `yaml:"maxTypes"` // 每个 _activities.json 的 type 最大个数
+	Path     string `yaml:"path"`     // Index output directory
+	MaxNotes int    `yaml:"maxNotes"` // Maximum flash-notes count
+	MaxTags  int    `yaml:"maxTags"`  // Maximum tag count
+	MaxTypes int    `yaml:"maxTypes"` // Maximum types per _activities.json
 }
 
-// DefaultConfig 返回默认配置
+// DefaultConfig returns default configuration
 func DefaultConfig() *Config {
 	return &Config{
 		Watcher: WatcherConfig{
@@ -78,11 +78,11 @@ func DefaultConfig() *Config {
 	}
 }
 
-// Load 从指定路径加载配置文件，如果文件不存在则使用默认配置
+// Load loads configuration from specified path, uses default if file not found
 func Load(configPath string) (*Config, error) {
 	cfg := DefaultConfig()
 
-	// 如果没有指定配置文件路径，使用默认路径
+	// Use default path if not specified
 	if configPath == "" {
 		configPath = ".kimi-indexer.yaml"
 	}
@@ -90,7 +90,7 @@ func Load(configPath string) (*Config, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// 配置文件不存在，使用默认配置
+			// Config file not found, use default
 			return cfg, nil
 		}
 		return nil, err
@@ -100,7 +100,7 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
-	// 处理相对路径
+	// Handle relative paths
 	if !filepath.IsAbs(cfg.Watcher.Root) {
 		cfg.Watcher.Root, _ = filepath.Abs(cfg.Watcher.Root)
 	}
@@ -111,7 +111,7 @@ func Load(configPath string) (*Config, error) {
 	return cfg, nil
 }
 
-// Save 将配置保存到指定路径
+// Save saves configuration to specified path
 func Save(cfg *Config, configPath string) error {
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
