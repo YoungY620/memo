@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "activities.schema.json",
+  "title": "_activities.json",
+  "description": "Activity tracking for each module",
+  "type": "object",
+  "maxProperties": 100,
+  "additionalProperties": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Activity content"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Tag list"
+            }
+          },
+          "required": ["content", "tags"],
+          "additionalProperties": false
+        }
+      },
+      "children": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Relative paths to child modules with this activity type"
+      }
+    },
+    "required": ["items", "children"],
+    "additionalProperties": false
+  },
+  "propertyNames": {
+    "minLength": 1
+  }
+}
