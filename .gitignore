@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+mcp/node_modules/
+
+# Build outputs
+dist/
+mcp/dist/
+indexer
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test repos
+kimi-cli/
+
+# Logs
+*.log
