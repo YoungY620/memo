@@ -1,4 +1,4 @@
-// Package watcher provides file watching functionality
+// Package watcher provides file monitoring functionality
 package watcher
 
 import (
@@ -10,7 +10,7 @@ import (
 	"github.com/user/kimi-sdk-agent-indexer/core/internal/config"
 )
 
-// EventType file changed事件类型
+// EventType file change event type
 type EventType int
 
 const (
@@ -35,24 +35,24 @@ func (e EventType) String() string {
 	}
 }
 
-// Event file changed事件
+// Event file change event
 type Event struct {
 	Path string
 	Type EventType
 }
 
-// Watcher 文件监控器
+// Watcher file monitor
 type Watcher struct {
-	fsWatcher  *fsnotify.Watcher
-	cfg        *config.WatcherConfig
-	events     chan Event
-	done       chan struct{}
-	rootPath   string
-	ignoreMap  map[string]bool
-	extMap     map[string]bool
+	fsWatcher *fsnotify.Watcher
+	cfg       *config.WatcherConfig
+	events    chan Event
+	done      chan struct{}
+	rootPath  string
+	ignoreMap map[string]bool
+	extMap    map[string]bool
 }
 
-// New 创建新的文件监控器
+// New creates a new file watcher
 func New(cfg *config.WatcherConfig) (*Watcher, error) {
 	fsWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -74,12 +74,12 @@ func New(cfg *config.WatcherConfig) (*Watcher, error) {
 		extMap:    make(map[string]bool),
 	}
 
-	// 构建忽略映射
+	// Build ignore map
 	for _, pattern := range cfg.Ignore {
 		w.ignoreMap[pattern] = true
 	}
 
-	// 构建扩展名映射
+	// Build extension map
 	for _, ext := range cfg.Extensions {
 		if !strings.HasPrefix(ext, ".") {
 			ext = "." + ext
@@ -90,12 +90,12 @@ func New(cfg *config.WatcherConfig) (*Watcher, error) {
 	return w, nil
 }
 
-// Start 启动监控
+// Start starts monitoring
 func (w *Watcher) Start() error {
-	// 递归添加目录
+	// Recursively add directories
 	err := filepath.Walk(w.rootPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // 忽略无法访问的路径
+			return nil // Ignore inaccessible paths
 		}
 		if info.IsDir() {
 			if w.shouldIgnore(path) {
@@ -109,23 +109,23 @@ func (w *Watcher) Start() error {
 		return err
 	}
 
-	// 启动事件处理
+	// Start event processing
 	go w.loop()
 	return nil
 }
 
-// Events 返回事件通道
+// Events returns the event channel
 func (w *Watcher) Events() <-chan Event {
 	return w.events
 }
 
-// Stop 停止监控
+// Stop stops monitoring
 func (w *Watcher) Stop() error {
 	close(w.done)
 	return w.fsWatcher.Close()
 }
 
-// loop 事件处理循环
+// loop event processing loop
 func (w *Watcher) loop() {
 	for {
 		select {
@@ -141,16 +141,16 @@ func (w *Watcher) loop() {
 			if !ok {
 				return
 			}
-			// 忽略错误，继续监控
+			// Ignore errors, continue monitoring
 		}
 	}
 }
 
-// handleEvent 处理单个 fsnotify 事件
+// handleEvent handles a single fsnotify event
 func (w *Watcher) handleEvent(e fsnotify.Event) {
 	path := e.Name
 
-	// 检查是否应该忽略
+	// Check if should ignore
 	if w.shouldIgnore(path) {
 		return
 	}
@@ -164,10 +164,10 @@ func (w *Watcher) handleEvent(e fsnotify.Event) {
 	switch {
 	case e.Op&fsnotify.Create != 0:
 		eventType = EventCreate
-		// 如果是目录，添加监控
+		// If directory, add to watch
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
 			_ = w.fsWatcher.Add(path)
-			return // 不发送目录创建事件
+			return // Don't send directory create event
 		}
 	case e.Op&fsnotify.Write != 0:
 		eventType = EventModify
@@ -179,15 +179,15 @@ func (w *Watcher) handleEvent(e fsnotify.Event) {
 		return
 	}
 
-	// 发送事件
+	// Send event
 	select {
 	case w.events <- Event{Path: path, Type: eventType}:
 	default:
-		// 通道满了，丢弃事件
+		// Channel full, discard event
 	}
 }
 
-// shouldIgnore 检查路径是否应该被忽略
+// shouldIgnore checks if path should be ignored
 func (w *Watcher) shouldIgnore(path string) bool {
 	relPath, err := filepath.Rel(w.rootPath, path)
 	if err != nil {
@@ -203,9 +203,9 @@ func (w *Watcher) shouldIgnore(path string) bool {
 	return false
 }
 
-// shouldWatch 检查文件是否应该被监控（基于扩展名）
+// shouldWatch checks if file should be monitored (based on extension)
 func (w *Watcher) shouldWatch(path string) bool {
-	// 如果没有配置扩展名，监控所有文件
+	// If no extensions configured, monitor all files
 	if len(w.extMap) == 0 {
 		return true
 	}

@@ -9,10 +9,10 @@ import (
 	"github.com/user/kimi-sdk-agent-indexer/core/internal/config"
 )
 
-// TriggerFunc 触发时调用的函数
+// TriggerFunc function called when triggered
 type TriggerFunc func(changes []buffer.Change)
 
-// Manager 触发管理器
+// Manager trigger manager
 type Manager struct {
 	cfg       *config.TriggerConfig
 	buf       *buffer.Buffer
@@ -23,7 +23,7 @@ type Manager struct {
 	running   bool
 }
 
-// New 创建新的触发管理器
+// New creates a new trigger manager
 func New(cfg *config.TriggerConfig, buf *buffer.Buffer, triggerFn TriggerFunc) *Manager {
 	return &Manager{
 		cfg:       cfg,
@@ -33,7 +33,7 @@ func New(cfg *config.TriggerConfig, buf *buffer.Buffer, triggerFn TriggerFunc) *
 	}
 }
 
-// Start 启动触发管理器
+// Start starts the trigger manager
 func (m *Manager) Start() {
 	m.mu.Lock()
 	if m.running {
@@ -43,14 +43,14 @@ func (m *Manager) Start() {
 	m.running = true
 	m.mu.Unlock()
 
-	// 初始化空闲计时器
+	// Initialize idle timer
 	idleTimeout := time.Duration(m.cfg.IdleMs) * time.Millisecond
 	m.idleTimer = time.NewTimer(idleTimeout)
 
 	go m.loop()
 }
 
-// Stop 停止触发管理器
+// Stop stops the trigger manager
 func (m *Manager) Stop() {
 	m.mu.Lock()
 	if !m.running {
@@ -66,7 +66,7 @@ func (m *Manager) Stop() {
 	}
 }
 
-// NotifyChange 通知有新的变更
+// NotifyChange notifies that there's a new change
 func (m *Manager) NotifyChange() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -75,42 +75,42 @@ func (m *Manager) NotifyChange() {
 		return
 	}
 
-	// 重置空闲计时器
+	// Reset idle timer
 	if m.idleTimer != nil {
 		m.idleTimer.Stop()
 		idleTimeout := time.Duration(m.cfg.IdleMs) * time.Millisecond
 		m.idleTimer.Reset(idleTimeout)
 	}
 
-	// 检查是否达到文件数阈值
+	// Check if file count threshold reached
 	if m.buf.Count() >= m.cfg.MinFiles {
 		go m.trigger()
 	}
 }
 
-// loop 主循环
+// loop main loop
 func (m *Manager) loop() {
 	for {
 		select {
 		case <-m.done:
-			// 退出前触发一次（如果有变更）
+			// Trigger once before exit (if there are changes)
 			if !m.buf.IsEmpty() {
 				m.trigger()
 			}
 			return
 		case <-m.idleTimer.C:
-			// 空闲超时，如果缓冲区非空则触发
+			// Idle timeout, trigger if buffer not empty
 			if !m.buf.IsEmpty() {
 				m.trigger()
 			}
-			// 重置计时器
+			// Reset timer
 			idleTimeout := time.Duration(m.cfg.IdleMs) * time.Millisecond
 			m.idleTimer.Reset(idleTimeout)
 		}
 	}
 }
 
-// trigger 执行触发
+// trigger executes the trigger
 func (m *Manager) trigger() {
 	changes := m.buf.Flush()
 	if len(changes) == 0 {
@@ -121,7 +121,7 @@ func (m *Manager) trigger() {
 	}
 }
 
-// ForceTrigger 强制触发（用于手动触发或测试）
+// ForceTrigger forces a trigger (for manual trigger or testing)
 func (m *Manager) ForceTrigger() {
 	m.trigger()
 }

@@ -1,4 +1,4 @@
-// Package analyzer provides analysis processing, calls Kimi API to generate index
+// Package analyzer provides analysis processing functionality, calls Kimi API to generate index
 package analyzer
 
 import (
@@ -15,13 +15,13 @@ import (
 	"github.com/user/kimi-sdk-agent-indexer/core/internal/config"
 )
 
-// Analyzer 分析处理器
+// Analyzer analysis processor
 type Analyzer struct {
 	cfg      *config.Config
 	rootPath string
 }
 
-// New 创建新的分析器
+// New creates a new analyzer
 func New(cfg *config.Config) *Analyzer {
 	return &Analyzer{
 		cfg:      cfg,
@@ -29,25 +29,25 @@ func New(cfg *config.Config) *Analyzer {
 	}
 }
 
-// Analyze 分析变更并更新索引
+// Analyze analyzes changes and updates index
 func (a *Analyzer) Analyze(ctx context.Context, changes []buffer.Change) error {
 	if len(changes) == 0 {
 		return nil
 	}
 
-	// 构建 prompt
+	// Build prompt
 	prompt, err := a.buildPrompt(changes)
 	if err != nil {
 		return fmt.Errorf("failed to build prompt: %w", err)
 	}
 
-	// 调用 Kimi
+	// Call Kimi
 	response, err := a.callKimi(ctx, prompt)
 	if err != nil {
 		return fmt.Errorf("failed to call Kimi: %w", err)
 	}
 
-	// 解析响应并更新索引
+	// Parse response and update index
 	if err := a.updateIndex(response); err != nil {
 		return fmt.Errorf("failed to update index: %w", err)
 	}
@@ -55,62 +55,62 @@ func (a *Analyzer) Analyze(ctx context.Context, changes []buffer.Change) error {
 	return nil
 }
 
-// buildPrompt 构建分析 prompt
+// buildPrompt builds the analysis prompt
 func (a *Analyzer) buildPrompt(changes []buffer.Change) (string, error) {
 	var sb strings.Builder
 
 	sb.WriteString(`You are a code analysis expert. Please analyze the following code changes and update the project semantic index.
 
-## Index specification
+## Index Specification
 
-1. index directory结构:
-   - _index.md: 组件关系图（Mermaid UML）+ 子模块/引用摘要导航
-   - _activities.json: 活动追踪（TODO/Bug/Issue 等）
-   - _reference/: 详细内容
-   - _tags.json: 可用 tag 列表（仅根目录）
-   - _notes.json: flash-notes（仅根目录）
+1. Index directory structure:
+   - _index.md: Component relationship diagram (Mermaid UML) + submodule/reference summary navigation
+   - _activities.json: Activity tracking (TODO/Bug/Issue etc.)
+   - _reference/: Detailed content
+   - _tags.json: Available tag list (root directory only)
+   - _notes.json: Flash-notes (root directory only)
 
-2. _index.md 规则:
-   - 优先使用 Mermaid 图表示组件关系
-   - 组件级抽象，不做白盒讲解
-   - 详情放 _reference/，通过摘要引用
+2. _index.md rules:
+   - Prefer Mermaid diagrams for component relationships
+   - Component-level abstraction, no white-box explanation
+   - Details go to _reference/, referenced via summary
 
-3. _activities.json 格式:
+3. _activities.json format:
    {
      "<type>": {
        "items": [{ "content": "...", "tags": ["..."] }],
-       "children": ["子模块相对路径"]
+       "children": ["relative path to submodule"]
      }
    }
 
-4. 子模块路径映射规则:
-   - 源文件 src/core/watcher.go -> 索引 core/_reference/watcher.md
-   - 源目录 src/core/trigger/ -> 索引 core/trigger/_index.md
+4. Submodule path mapping rules:
+   - Source file src/core/watcher.go -> Index core/_reference/watcher.md
+   - Source directory src/core/trigger/ -> Index core/trigger/_index.md
 
 `)
 
-	// 添加Current index structure
-	sb.WriteString("## Current index structure\n\n")
+	// Add current index structure
+	sb.WriteString("## Current Index Structure\n\n")
 	indexTree, err := a.getIndexTree()
 	if err != nil {
-		sb.WriteString("（index directory不存在或为空，请创建初始索引）\n\n")
+		sb.WriteString("(Index directory does not exist or is empty, please create initial index)\n\n")
 	} else {
 		sb.WriteString("```\n")
 		sb.WriteString(indexTree)
 		sb.WriteString("\n```\n\n")
 	}
 
-	// 添加变更列表
+	// Add change list
 	sb.WriteString("## Changes\n\n")
 	for _, change := range changes {
 		relPath, _ := filepath.Rel(a.rootPath, change.Path)
 		sb.WriteString(fmt.Sprintf("### %s [%s]\n\n", relPath, change.Type.String()))
 
-		// 如果不是删除操作，添加文件内容
+		// If not delete operation, add file content
 		if change.Type != buffer.ChangeDelete {
 			content, err := os.ReadFile(change.Path)
 			if err == nil {
-				// 限制内容长度
+				// Limit content length
 				contentStr := string(content)
 				if len(contentStr) > 5000 {
 					contentStr = contentStr[:5000] + "\n... (content too long, truncated)"
@@ -122,31 +122,31 @@ func (a *Analyzer) buildPrompt(changes []buffer.Change) (string, error) {
 		}
 	}
 
-	// 添加Output format说明
-	sb.WriteString(`## Output format
+	// Add output format description
+	sb.WriteString(`## Output Format
 
-请按以下格式输出需要创建或更新的文件：
+Please output files to create or update in the following format:
 
 ---FILE: path/to/file.md---
-[文件内容]
+[file content]
 ---END---
 
 ---FILE: path/to/another.json---
-[文件内容]
+[file content]
 ---END---
 
-注意：
-1. 路径相对于 .kimi-index/ 目录
-2. 如果是首次创建索引，需要创建 _index.md, _tags.json, _notes.json, _activities.json
-3. 每个子模块目录需要 _index.md 和 _activities.json
-4. _reference/ 中的文件需要在对应 _index.md 中引用
-5. 所有 tag 必须在根目录 _tags.json 中定义
+Notes:
+1. Paths are relative to .kimi-index/ directory
+2. If creating index for the first time, create _index.md, _tags.json, _notes.json, _activities.json
+3. Each submodule directory needs _index.md and _activities.json
+4. Files in _reference/ must be referenced in corresponding _index.md
+5. All tags must be defined in root _tags.json
 `)
 
 	return sb.String(), nil
 }
 
-// getIndexTree 获取当前index directory树
+// getIndexTree gets current index directory tree
 func (a *Analyzer) getIndexTree() (string, error) {
 	indexPath := a.cfg.Index.Path
 	if _, err := os.Stat(indexPath); os.IsNotExist(err) {
@@ -177,7 +177,7 @@ func (a *Analyzer) getIndexTree() (string, error) {
 	return sb.String(), nil
 }
 
-// callKimi 调用 Kimi API
+// callKimi calls Kimi API
 func (a *Analyzer) callKimi(ctx context.Context, prompt string) (string, error) {
 	session, err := kimi.NewSession()
 	if err != nil {
@@ -202,14 +202,14 @@ func (a *Analyzer) callKimi(ctx context.Context, prompt string) (string, error) 
 	return result.String(), nil
 }
 
-// updateIndex 解析响应并更新索引文件
+// updateIndex parses response and updates index files
 func (a *Analyzer) updateIndex(response string) error {
-	// 确保index directory存在
+	// Ensure index directory exists
 	if err := os.MkdirAll(a.cfg.Index.Path, 0755); err != nil {
 		return err
 	}
 
-	// 解析 ---FILE: path---...---END--- 块
+	// Parse ---FILE: path---...---END--- blocks
 	filePattern := regexp.MustCompile(`(?s)---FILE:\s*(.+?)---\n(.*?)---END---`)
 	matches := filePattern.FindAllStringSubmatch(response, -1)
 
@@ -220,16 +220,16 @@ func (a *Analyzer) updateIndex(response string) error {
 		relPath := strings.TrimSpace(match[1])
 		content := strings.TrimSpace(match[2])
 
-		// 构建完整路径
+		// Build full path
 		fullPath := filepath.Join(a.cfg.Index.Path, relPath)
 
-		// 确保父目录存在
+		// Ensure parent directory exists
 		dir := filepath.Dir(fullPath)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 
-		// 写入文件
+		// Write file
 		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
 			return fmt.Errorf("failed to write file %s: %w", fullPath, err)
 		}
@@ -238,43 +238,43 @@ func (a *Analyzer) updateIndex(response string) error {
 	return nil
 }
 
-// InitIndex initialize index directory（创建基础结构）
+// InitIndex initializes index directory (creates base structure)
 func (a *Analyzer) InitIndex(ctx context.Context) error {
 	indexPath := a.cfg.Index.Path
 
-	// 创建index directory
+	// Create index directory
 	if err := os.MkdirAll(indexPath, 0755); err != nil {
 		return err
 	}
 
-	// 检查是否已有索引
+	// Check if index already exists
 	indexFile := filepath.Join(indexPath, "_index.md")
 	if _, err := os.Stat(indexFile); err == nil {
-		// 索引已存在
+		// Index already exists
 		return nil
 	}
 
-	// 创建初始文件
+	// Create initial files
 	backticks := "```"
 	files := map[string]string{
 		"_index.md": fmt.Sprintf(`# Project Index
 
-## 组件关系
+## Component Relationships
 
 %smermaid
 graph LR
-    Root[项目根目录]
+    Root[Project Root]
 %s
 
-## 子模块
+## Submodules
 
-| 模块 | 简介 |
-|------|------|
+| Module | Description |
+|--------|-------------|
 
-## 引用
+## References
 
-| 文件 | 摘要 |
-|------|------|
+| File | Summary |
+|------|---------|
 `, backticks, backticks),
 		"_tags.json":       `["todo", "bug", "feature", "refactor", "test", "docs"]`,
 		"_notes.json":      `[]`,

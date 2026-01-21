@@ -7,7 +7,7 @@ import (
 	"github.com/user/kimi-sdk-agent-indexer/core/internal/watcher"
 )
 
-// ChangeType 变更类型
+// ChangeType change type
 type ChangeType int
 
 const (
@@ -29,26 +29,26 @@ func (c ChangeType) String() string {
 	}
 }
 
-// Change 单个file changed
+// Change single file change
 type Change struct {
 	Path string
 	Type ChangeType
 }
 
-// Buffer 变更缓冲区
+// Buffer change buffer
 type Buffer struct {
-	changes map[string]ChangeType // 以路径为 key
+	changes map[string]ChangeType // keyed by path
 	mu      sync.RWMutex
 }
 
-// New 创建新的变更缓冲区
+// New creates a new change buffer
 func New() *Buffer {
 	return &Buffer{
 		changes: make(map[string]ChangeType),
 	}
 }
 
-// Add 添加变更事件
+// Add adds a change event
 func (b *Buffer) Add(event watcher.Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -56,12 +56,12 @@ func (b *Buffer) Add(event watcher.Event) {
 	path := event.Path
 	newType := eventToChangeType(event.Type)
 
-	// 检查是否已有该文件的变更记录
+	// Check if there's existing change record for this file
 	if oldType, exists := b.changes[path]; exists {
-		// 合并变更
+		// Merge changes
 		merged := mergeChanges(oldType, newType)
 		if merged == -1 {
-			// create + delete = 移除
+			// create + delete = remove
 			delete(b.changes, path)
 		} else {
 			b.changes[path] = merged
@@ -71,14 +71,14 @@ func (b *Buffer) Add(event watcher.Event) {
 	}
 }
 
-// Count 返回缓冲区中的变更文件数
+// Count returns the number of changed files in buffer
 func (b *Buffer) Count() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return len(b.changes)
 }
 
-// Flush 取出并清空所有变更
+// Flush retrieves and clears all changes
 func (b *Buffer) Flush() []Change {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -91,19 +91,19 @@ func (b *Buffer) Flush() []Change {
 		})
 	}
 
-	// 清空缓冲区
+	// Clear buffer
 	b.changes = make(map[string]ChangeType)
 	return changes
 }
 
-// IsEmpty 检查缓冲区是否为空
+// IsEmpty checks if buffer is empty
 func (b *Buffer) IsEmpty() bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return len(b.changes) == 0
 }
 
-// eventToChangeType 将 watcher 事件类型转换为变更类型
+// eventToChangeType converts watcher event type to change type
 func eventToChangeType(e watcher.EventType) ChangeType {
 	switch e {
 	case watcher.EventCreate:
@@ -117,15 +117,15 @@ func eventToChangeType(e watcher.EventType) ChangeType {
 	}
 }
 
-// mergeChanges 合并两个变更类型
-// 返回 -1 表示应该移除这条记录
+// mergeChanges merges two change types
+// Returns -1 if the record should be removed
 func mergeChanges(old, new ChangeType) ChangeType {
 	/*
-		合并规则：
-		| 旧事件 | 新事件 | 结果 |
-		|--------|--------|------|
+		Merge rules:
+		| Old    | New    | Result |
+		|--------|--------|--------|
 		| create | modify | create |
-		| create | delete | 移除 |
+		| create | delete | remove |
 		| modify | modify | modify |
 		| modify | delete | delete |
 	*/
@@ -133,7 +133,7 @@ func mergeChanges(old, new ChangeType) ChangeType {
 	case old == ChangeCreate && new == ChangeModify:
 		return ChangeCreate
 	case old == ChangeCreate && new == ChangeDelete:
-		return -1 // 移除
+		return -1 // remove
 	case old == ChangeModify && new == ChangeModify:
 		return ChangeModify
 	case old == ChangeModify && new == ChangeDelete:
