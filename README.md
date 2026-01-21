@@ -1,40 +1,73 @@
-# Kimi SDK Agent Indexer
+# Lightkeeper
 
-多文档一致性管理与动态索引维护服务。
+> *In the age of vibe coding, when agents navigate vast codebases through fog and storm, the Lightkeeper stands watch — faithful, tireless, ensuring no ship loses its way.*
 
-监控文件变化，利用 AI 生成渐进式披露的索引文档，供 Agent 高效探索。
+**Lightkeeper** is a semantic indexing service for the vibe coding era. It watches your files, maintains a faithful map of your codebase, and keeps AI agents oriented — no matter how large or fast-moving your project becomes.
 
-适用于代码、文档、配置、笔记等任意文件集合。
+## Why Lightkeeper?
 
-## 模块
+Traditional IDEs have indexers for syntax analysis — they parse your code, build symbol tables, and enable features like "go to definition" and autocomplete.
 
-| 模块 | 职责 |
-|------|------|
-| **Core** | 监听文件变化 → 积攒变更 → 调用 Kimi → 更新 index 文件夹 |
-| **MCP** | 只读接口，供 Agent 探索 index 内容 |
+**Lightkeeper is the indexer for vibe coding.**
 
-## 快速开始
+When you're building with AI agents, the challenge isn't syntax — it's *coherence*. As projects grow, agents lose sight of the whole. They make changes that conflict with distant parts of the codebase. They forget architectural decisions made yesterday. They drift.
 
-```bash
-# 安装
-npm install -g kimi-agent-indexer
+**Loss of global coherence is the #1 reason vibe coding projects spiral out of control.**
 
-# 启动索引服务（监控当前目录）
-kimi-indexer start
+Lightkeeper solves this by maintaining an **absolutely reliable source of truth** — a semantic index that evolves with your code, always consistent, always available. It's not just about saving context tokens (though it does that too). It's about giving agents a faithful map they can trust.
 
-# 仅启动 MCP 服务（供 Agent 使用）
-kimi-indexer mcp --index-path .kimi-index
+## How It Works
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Your Files    │────▶│   Lightkeeper   │────▶│  Semantic Index │
+│  (code, docs)   │     │   (watcher +    │     │   (.kimi-index) │
+│                 │     │    AI engine)   │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+                                               ┌─────────────────┐
+                                               │   AI Agents     │
+                                               │ (via MCP tools) │
+                                               └─────────────────┘
 ```
 
-## MCP 配置
+1. **Watch**: Lightkeeper monitors your files for changes
+2. **Accumulate**: Changes are buffered and debounced intelligently  
+3. **Analyze**: When ready, AI analyzes the changes and updates the index
+4. **Serve**: Agents access the index through MCP tools — progressive disclosure, search, navigation
+
+The index is designed for **progressive disclosure**: agents can start with a high-level overview and drill down only where needed, preserving precious context for actual work.
+
+## Modules
+
+| Module | Responsibility |
+|--------|----------------|
+| **Core** | File watching → Change buffering → AI analysis → Index updates |
+| **MCP** | Read-only interface for agents to explore the index |
+
+## Quick Start
+
+```bash
+# Build
+go build -o lightkeeper ./core/cmd/indexer
+
+# Start watching (monitors current directory)
+./lightkeeper start
+
+# Or just serve the MCP interface for existing index
+./lightkeeper mcp --index-path .kimi-index
+```
+
+## MCP Configuration
 
 ### IDE / Cursor
 
 ```json
 {
   "mcpServers": {
-    "project-index": {
-      "command": "kimi-indexer",
+    "lightkeeper": {
+      "command": "lightkeeper",
       "args": ["mcp", "--index-path", "/path/to/project/.kimi-index"]
     }
   }
@@ -46,14 +79,23 @@ kimi-indexer mcp --index-path .kimi-index
 ```yaml
 mcp:
   servers:
-    project-index:
-      command: kimi-indexer
+    lightkeeper:
+      command: lightkeeper
       args: ["mcp", "--index-path", "/path/to/project/.kimi-index"]
 ```
 
-## 文档
+## Documentation
 
-- [设计文档](./DESIGN.md) - 架构设计和实现计划
+- [DESIGN.md](./DESIGN.md) — Architecture and implementation details
+- [INDEX.md](./INDEX.md) — Index storage structure
+- [MCP.md](./MCP.md) — MCP module design
+- [VALIDATOR.md](./VALIDATOR.md) — Validation rules
+
+## The Name
+
+A **lightkeeper** is the keeper of a lighthouse — the person who tends the flame, ensures the light never goes out, and guides ships safely through darkness and storm.
+
+In vibe coding, your codebase is the sea. AI agents are the ships. And Lightkeeper stands watch, maintaining the one true map, so that no matter how wild the waters get, every agent can find its way.
 
 ## License
 
