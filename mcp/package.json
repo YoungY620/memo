@@ -1,0 +1,28 @@
+{
+  "name": "@kimi-indexer/mcp",
+  "version": "1.0.0",
+  "description": "MCP server for kimi-indexer - read-only file access for AI agents",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "kimi-indexer-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "minimatch": "^10.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
