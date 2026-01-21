@@ -84,13 +84,6 @@ mcp:
       args: ["mcp", "--index-path", "/path/to/project/.kimi-index"]
 ```
 
-## Documentation
-
-- [DESIGN.md](./DESIGN.md) — Architecture and implementation details
-- [INDEX.md](./INDEX.md) — Index storage structure
-- [MCP.md](./MCP.md) — MCP module design
-- [VALIDATOR.md](./VALIDATOR.md) — Validation rules
-
 ## The Name
 
 A **lightkeeper** is the keeper of a lighthouse — the person who tends the flame, ensures the light never goes out, and guides ships safely through darkness and storm.
