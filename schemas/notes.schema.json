@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "notes.schema.json",
+  "title": "_notes.json",
+  "description": "flash-notes, root directory only",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "content": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Note content"
+      },
+      "tags": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Tag list"
+      }
+    },
+    "required": ["content", "tags"],
+    "additionalProperties": false
+  },
+  "maxItems": 50
+}

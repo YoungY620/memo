@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tags.schema.json",
+  "title": "_tags.json",
+  "description": "Available tag list, root directory only",
+  "type": "array",
+  "items": {
+    "type": "string",
+    "minLength": 1
+  },
+  "uniqueItems": true,
+  "maxItems": 100
+}
