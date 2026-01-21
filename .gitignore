@@ -22,3 +22,5 @@ kimi-cli/
 
 # Logs
 *.log
+
+.sensitive/
