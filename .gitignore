@@ -24,3 +24,5 @@ kimi-cli/
 *.log
 
 .sensitive/
+# Local development files
+.local/

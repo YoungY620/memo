@@ -2,26 +2,44 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "notes.schema.json",
   "title": "_notes.json",
-  "description": "flash-notes, root directory only",
+  "description": "Flash notes (root directory only)",
   "type": "array",
   "items": {
     "type": "object",
     "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Unique identifier (UUID v4)"
+      },
       "content": {
         "type": "string",
         "minLength": 1,
+        "maxLength": 10000,
         "description": "Note content"
       },
       "tags": {
         "type": "array",
         "items": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9-]*$"
         },
-        "description": "Tag list"
+        "uniqueItems": true,
+        "description": "Tag list (must be defined in _tags.json)"
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Creation timestamp (ISO 8601)"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Last update timestamp (ISO 8601)"
       }
     },
-    "required": ["content", "tags"],
+    "required": ["content"],
     "additionalProperties": false
   },
   "maxItems": 50
