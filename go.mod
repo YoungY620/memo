@@ -1,4 +1,4 @@
-module github.com/YoungY620/lightkeeper
+module github.com/YoungY620/memo
 
 go 1.25.5
 

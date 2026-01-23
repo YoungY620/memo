@@ -1,39 +1,39 @@
-# Lightkeeper
+# Memo
 
-AI-powered codebase documentation keeper. Watches file changes and automatically maintains `.baecon` documentation using Kimi Agent.
+AI-powered codebase memory keeper. Watches file changes and maintains `.memo` documentation for coding agents.
 
 ## Installation
 
 ### Option 1: go install (requires Go 1.21+)
 
 ```bash
-go install github.com/YoungY620/lightkeeper@latest
+go install github.com/YoungY620/memo@latest
 ```
 
 ### Option 2: One-line install script
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/YoungY620/lightkeeper/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/YoungY620/memo/main/install.sh | bash
 ```
 
 ### Option 3: Download binary
 
-Download from [Releases](https://github.com/YoungY620/lightkeeper/releases) and add to PATH.
+Download from [Releases](https://github.com/YoungY620/memo/releases) and add to PATH.
 
 ## Usage
 
 ```bash
 # Watch current directory
-lightkeeper
+memo
 
 # Watch specific directory
-lightkeeper --path /path/to/project
+memo --path /path/to/project
 
 # Use custom config
-lightkeeper --config /path/to/config.yaml
+memo --config /path/to/config.yaml
 
 # Show version
-lightkeeper --version
+memo --version
 ```
 
 ## Configuration
@@ -51,7 +51,7 @@ watch:
   ignore_patterns:
     - ".git"
     - "node_modules"
-    - ".baecon"
+    - ".memo"
     - "*.log"
   debounce_ms: 5000    # 5s quiet period
   max_wait_ms: 300000  # 5min max wait
@@ -59,7 +59,7 @@ watch:
 
 ## Output
 
-Lightkeeper maintains `.baecon/` directory with:
+Memo maintains `.memo/` directory with:
 
 - `arch.json` - Module definitions
 - `interface.json` - External/internal interfaces
