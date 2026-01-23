@@ -44,7 +44,7 @@ func main() {
 	analyser := NewAnalyser(cfg, workDir)
 
 	// Create watcher
-	watcher, err := NewWatcher(workDir, cfg.Watch.IgnorePatterns, cfg.Watch.DebounceMs, func(files []string) {
+	watcher, err := NewWatcher(workDir, cfg.Watch.IgnorePatterns, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs, func(files []string) {
 		log.Printf("Files changed: %v", files)
 		ctx := context.Background()
 		if err := analyser.Analyse(ctx, files); err != nil {

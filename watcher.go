@@ -11,68 +11,59 @@ import (
 )
 
 type Watcher struct {
-	root           string
-	ignorePatterns []string
-	debounceMs     int
-	onChange       func(files []string)
-	watcher        *fsnotify.Watcher
+	root, debounceMs, maxWaitMs int
+	ignorePatterns              []string
+	onChange                    func([]string)
+	watcher                     *fsnotify.Watcher
+	rootPath                    string
 
-	mu           sync.Mutex
-	pendingFiles map[string]struct{}
-	timer        *time.Timer
+	mu                sync.Mutex
+	pending           map[string]struct{}
+	debounce, maxWait *time.Timer
 }
 
-func NewWatcher(root string, ignorePatterns []string, debounceMs int, onChange func(files []string)) (*Watcher, error) {
+func NewWatcher(root string, ignore []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
-
 	w := &Watcher{
-		root:           root,
-		ignorePatterns: ignorePatterns,
+		rootPath:       root,
+		ignorePatterns: ignore,
 		debounceMs:     debounceMs,
+		maxWaitMs:      maxWaitMs,
 		onChange:       onChange,
 		watcher:        fsw,
-		pendingFiles:   make(map[string]struct{}),
+		pending:        make(map[string]struct{}),
 	}
-
-	if err := w.addRecursive(root); err != nil {
+	if err := w.watchAll(root); err != nil {
 		fsw.Close()
 		return nil, err
 	}
-
 	return w, nil
 }
 
-func (w *Watcher) addRecursive(dir string) error {
-	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
+func (w *Watcher) watchAll(dir string) error {
+	return filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
 			return err
 		}
-		if d.IsDir() {
-			if w.shouldIgnore(path) {
-				return filepath.SkipDir
-			}
-			return w.watcher.Add(path)
+		if w.ignored(p) {
+			return filepath.SkipDir
 		}
-		return nil
+		return w.watcher.Add(p)
 	})
 }
 
-func (w *Watcher) shouldIgnore(path string) bool {
-	rel, _ := filepath.Rel(w.root, path)
-	for _, pattern := range w.ignorePatterns {
-		if strings.HasPrefix(pattern, "*.") {
-			// extension match
-			if strings.HasSuffix(path, pattern[1:]) {
-				return true
-			}
-		} else {
-			// directory/file name match
-			if strings.Contains(rel, pattern) || filepath.Base(path) == pattern {
-				return true
-			}
+func (w *Watcher) ignored(path string) bool {
+	rel, _ := filepath.Rel(w.rootPath, path)
+	base := filepath.Base(path)
+	for _, p := range w.ignorePatterns {
+		if strings.HasPrefix(p, "*.") && strings.HasSuffix(path, p[1:]) {
+			return true
+		}
+		if strings.Contains(rel, p) || base == p {
+			return true
 		}
 	}
 	return false
@@ -81,54 +72,63 @@ func (w *Watcher) shouldIgnore(path string) bool {
 func (w *Watcher) Run() error {
 	for {
 		select {
-		case event, ok := <-w.watcher.Events:
+		case e, ok := <-w.watcher.Events:
 			if !ok {
 				return nil
 			}
-			if w.shouldIgnore(event.Name) {
+			if w.ignored(e.Name) {
 				continue
 			}
-			// handle new directories
-			if event.Op&fsnotify.Create != 0 {
-				if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-					w.watcher.Add(event.Name)
+			if e.Op&fsnotify.Create != 0 {
+				if info, err := os.Stat(e.Name); err == nil && info.IsDir() {
+					w.watcher.Add(e.Name)
 				}
 			}
-			// collect changed files
-			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
-				w.addPending(event.Name)
+			if e.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
+				w.add(e.Name)
 			}
-		case err, ok := <-w.watcher.Errors:
+		case _, ok := <-w.watcher.Errors:
 			if !ok {
 				return nil
-			}
-			if err != nil {
-				// log but continue
-				continue
 			}
 		}
 	}
 }
 
-func (w *Watcher) addPending(file string) {
+func (w *Watcher) add(file string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	w.pendingFiles[file] = struct{}{}
+	first := len(w.pending) == 0
+	w.pending[file] = struct{}{}
 
-	if w.timer != nil {
-		w.timer.Stop()
+	// Reset debounce timer
+	if w.debounce != nil {
+		w.debounce.Stop()
 	}
-	w.timer = time.AfterFunc(time.Duration(w.debounceMs)*time.Millisecond, w.flush)
+	w.debounce = time.AfterFunc(time.Duration(w.debounceMs)*time.Millisecond, w.flush)
+
+	// Start max wait timer on first change
+	if first {
+		w.maxWait = time.AfterFunc(time.Duration(w.maxWaitMs)*time.Millisecond, w.flush)
+	}
 }
 
 func (w *Watcher) flush() {
 	w.mu.Lock()
-	files := make([]string, 0, len(w.pendingFiles))
-	for f := range w.pendingFiles {
+	if w.debounce != nil {
+		w.debounce.Stop()
+		w.debounce = nil
+	}
+	if w.maxWait != nil {
+		w.maxWait.Stop()
+		w.maxWait = nil
+	}
+	files := make([]string, 0, len(w.pending))
+	for f := range w.pending {
 		files = append(files, f)
 	}
-	w.pendingFiles = make(map[string]struct{})
+	w.pending = make(map[string]struct{})
 	w.mu.Unlock()
 
 	if len(files) > 0 && w.onChange != nil {
@@ -137,5 +137,13 @@ func (w *Watcher) flush() {
 }
 
 func (w *Watcher) Close() error {
+	w.mu.Lock()
+	if w.debounce != nil {
+		w.debounce.Stop()
+	}
+	if w.maxWait != nil {
+		w.maxWait.Stop()
+	}
+	w.mu.Unlock()
 	return w.watcher.Close()
 }
