@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"log"
 	"path/filepath"
 	"strings"
 
@@ -18,7 +17,7 @@ var promptFS embed.FS
 func loadPrompt(name string) string {
 	data, err := promptFS.ReadFile("prompts/" + name + ".md")
 	if err != nil {
-		log.Printf("Warning: failed to load prompt %s: %v", name, err)
+		logError("Failed to load prompt %s: %v", name, err)
 		return ""
 	}
 	return string(data)
@@ -39,6 +38,9 @@ func NewAnalyser(cfg *Config, workDir string) *Analyser {
 }
 
 func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
+	logInfo("Starting analysis for %d files", len(changedFiles))
+	logDebug("Creating agent session with model: %s", a.cfg.Agent.Model)
+
 	session, err := kimi.NewSession(
 		kimi.WithAPIKey(a.cfg.Agent.APIKey),
 		kimi.WithModel(a.cfg.Agent.Model),
@@ -53,11 +55,12 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	// Build initial prompt
 	contextPrompt := loadPrompt("context")
 	analysePrompt := loadPrompt("analyse")
-	
+
 	filesInfo := "Changed files:\n" + strings.Join(changedFiles, "\n")
 	initialPrompt := contextPrompt + "\n\n" + analysePrompt + "\n\n" + filesInfo
 
 	// Send initial prompt
+	logDebug("Sending initial analysis prompt")
 	if err := a.runPrompt(ctx, session, initialPrompt); err != nil {
 		return err
 	}
@@ -65,19 +68,21 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	// Validation loop
 	maxRetries := 5
 	for i := 0; i < maxRetries; i++ {
+		logDebug("Validating .baecon files (attempt %d/%d)", i+1, maxRetries)
 		result := ValidateBaecon(a.baeconDir)
 		if result.Valid {
-			log.Println("Validation passed")
+			logInfo("Validation passed")
 			return nil
 		}
 
-		log.Printf("Validation failed (attempt %d/%d): %s", i+1, maxRetries, FormatValidationErrors(result))
+		logError("Validation failed (attempt %d/%d): %s", i+1, maxRetries, FormatValidationErrors(result))
 
 		// Send feedback prompt
 		feedbackPrompt := loadPrompt("feedback")
 		errorInfo := "Validation errors:\n" + FormatValidationErrors(result)
 		fullFeedback := loadPrompt("context") + "\n\n" + feedbackPrompt + "\n\n" + errorInfo
 
+		logDebug("Sending feedback prompt")
 		if err := a.runPrompt(ctx, session, fullFeedback); err != nil {
 			return err
 		}
@@ -97,10 +102,11 @@ func (a *Analyser) runPrompt(ctx context.Context, session *kimi.Session, prompt 
 		for msg := range step.Messages {
 			switch m := msg.(type) {
 			case wire.ApprovalRequest:
+				logDebug("Auto-approving request")
 				m.Respond(wire.ApprovalRequestResponseApprove)
 			case wire.ContentPart:
 				if m.Type == wire.ContentPartTypeText && m.Text.Valid {
-					// Agent output, could log if needed
+					logDebug("Agent output: %s", truncate(m.Text.Value, 100))
 				}
 			}
 		}
@@ -111,4 +117,11 @@ func (a *Analyser) runPrompt(ctx context.Context, session *kimi.Session, prompt 
 	}
 
 	return nil
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }
