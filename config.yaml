@@ -1,3 +1,5 @@
+log_level: info  # error, notice, info, debug
+
 agent:
   api_key: "your-api-key-here"
   model: "your-model"
