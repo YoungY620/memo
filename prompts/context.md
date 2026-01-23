@@ -115,7 +115,7 @@ Contains user stories and call chains for understanding the system.
     {
       "title": "string - story title",
       "tags": ["string - category tags"],
-      "lines": ["string - each line is one step in the story or call chain"]
+      "content": "string - markdown content with text and mermaid diagrams"
     }
   ]
 }
@@ -128,28 +128,12 @@ Contains user stories and call chains for understanding the system.
     {
       "title": "User Registration Flow",
       "tags": ["user-story", "authentication", "onboarding"],
-      "lines": [
-        "1. User submits registration form with email and password",
-        "2. API validates input format and checks email uniqueness",
-        "3. Password is hashed using bcrypt with salt",
-        "4. User record is created in database with pending status",
-        "5. Verification email is sent via email service",
-        "6. User clicks verification link within 24 hours",
-        "7. Account status changes to active, user can now login"
-      ]
+      "content": "## Steps\n\n1. User submits registration form with email and password\n2. API validates input format and checks email uniqueness\n3. Password is hashed using bcrypt with salt\n4. User record is created in database with pending status\n5. Verification email is sent via email service\n6. User clicks verification link within 24 hours\n7. Account status changes to active, user can now login\n\n## Sequence Diagram\n\n```mermaid\nsequenceDiagram\n  User->>API: POST /register\n  API->>Database: Check email exists\n  Database-->>API: Not found\n  API->>Database: Create user (pending)\n  API->>EmailService: Send verification\n  API-->>User: 201 Created\n  User->>API: GET /verify?token=xxx\n  API->>Database: Update status (active)\n  API-->>User: 200 OK\n```"
     },
     {
       "title": "Request Processing Call Chain",
       "tags": ["call-chain", "api", "middleware"],
-      "lines": [
-        "main.go: HTTP server receives request",
-        "middleware/auth.go: JWT token validated, user context attached",
-        "middleware/ratelimit.go: Rate limit checked against Redis",
-        "router/api.go: Route matched, handler function called",
-        "handler/users.go: Business logic executed",
-        "repository/user.go: Database query performed",
-        "Response serialized and returned to client"
-      ]
+      "content": "## Flow\n\n```mermaid\ngraph TD\n  A[HTTP Request] --> B[auth middleware]\n  B --> C[ratelimit middleware]\n  C --> D[router]\n  D --> E[handler]\n  E --> F[repository]\n  F --> G[database]\n  G --> F\n  F --> E\n  E --> H[HTTP Response]\n```\n\n## Details\n\n- **main.go**: HTTP server receives request\n- **middleware/auth.go**: JWT token validated, user context attached\n- **middleware/ratelimit.go**: Rate limit checked against Redis\n- **router/api.go**: Route matched, handler function called\n- **handler/users.go**: Business logic executed\n- **repository/user.go**: Database query performed"
     }
   ]
 }
