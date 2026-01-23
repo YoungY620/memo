@@ -44,13 +44,13 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          go build -ldflags "-s -w -X main.Version=$VERSION" -o lightkeeper-${{ matrix.suffix }} .
+          go build -ldflags "-s -w -X main.Version=$VERSION" -o memo-${{ matrix.suffix }} .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lightkeeper-${{ matrix.suffix }}
-          path: lightkeeper-${{ matrix.suffix }}
+          name: memo-${{ matrix.suffix }}
+          path: memo-${{ matrix.suffix }}
 
   release:
     needs: build

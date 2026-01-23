@@ -1,11 +1,11 @@
 #!/bin/bash
-# Lightkeeper installer script
-# Usage: curl -sSL https://raw.githubusercontent.com/YoungY620/lightkeeper/main/install.sh | bash
+# Memo installer script
+# Usage: curl -sSL https://raw.githubusercontent.com/YoungY620/memo/main/install.sh | bash
 
 set -e
 
-REPO="YoungY620/lightkeeper"
-BINARY="lightkeeper"
+REPO="YoungY620/memo"
+BINARY="memo"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 # Detect OS and architecture

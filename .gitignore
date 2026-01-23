@@ -7,6 +7,7 @@ dist/
 mcp/dist/
 indexer
 lightkeeper
+memo
 
 # IDE
 .idea/

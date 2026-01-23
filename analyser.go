@@ -32,7 +32,7 @@ type Analyser struct {
 func NewAnalyser(cfg *Config, workDir string) *Analyser {
 	return &Analyser{
 		cfg:       cfg,
-		baeconDir: filepath.Join(workDir, ".baecon"),
+		baeconDir: filepath.Join(workDir, ".memo"),
 		workDir:   workDir,
 	}
 }
