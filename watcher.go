@@ -55,6 +55,20 @@ func (w *Watcher) watchAll(dir string) error {
 	})
 }
 
+// ScanAll traverses all files and adds them to pending, triggering initial analysis
+func (w *Watcher) ScanAll() {
+	filepath.WalkDir(w.rootPath, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if w.ignored(p) {
+			return nil
+		}
+		w.add(p)
+		return nil
+	})
+}
+
 func (w *Watcher) ignored(path string) bool {
 	rel, _ := filepath.Rel(w.rootPath, path)
 	base := filepath.Base(path)
