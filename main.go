@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -10,12 +11,20 @@ import (
 	"syscall"
 )
 
+var Version = "dev"
+
 func main() {
 	var (
-		pathFlag   = flag.String("path", "", "Path to watch (default: current directory)")
-		configFlag = flag.String("config", "config.yaml", "Path to config file")
+		pathFlag    = flag.String("path", "", "Path to watch (default: current directory)")
+		configFlag  = flag.String("config", "config.yaml", "Path to config file")
+		versionFlag = flag.Bool("version", false, "Print version and exit")
 	)
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("lightkeeper %s\n", Version)
+		os.Exit(0)
+	}
 
 	// Determine work directory
 	workDir := *pathFlag
