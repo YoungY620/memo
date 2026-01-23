@@ -25,8 +25,8 @@ Download from [Releases](https://github.com/YoungY620/memo/releases) and add to 
 ```bash
 git clone https://github.com/YoungY620/memo.git
 cd memo
-make build
-./memo --version
+make install  # builds and installs to /usr/local/bin
+memo --version
 ```
 
 ## Usage
