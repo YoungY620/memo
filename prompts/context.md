@@ -21,20 +21,11 @@ Contains all modules in the codebase.
       "interfaces": "string - brief description of inputs/outputs and which modules it interacts with"
     }
   ],
-  "relationships": {
-    "diagram": "string - Mermaid flowchart syntax (e.g. graph LR\\n  A --> B)",
-    "notes": "string - free-form description for details that Mermaid cannot express"
-  }
+  "relationships": "string - markdown content with text and mermaid code blocks"
 }
 ```
 
-**Mermaid Syntax Reference for diagram:**
-- `graph LR` (left-to-right) or `graph TD` (top-down)
-- `A --> B` (A calls/depends on B)
-- `A <--> B` (bidirectional)
-- `A -.-> B` (optional/async dependency)
-- `A ==> B` (strong dependency)
-- Use `\\n` for newlines in JSON string
+**Note:** The `relationships` field is a markdown string. Use `\\n` for newlines in JSON. You can mix free-form text with mermaid diagrams using triple backticks.
 
 **Example:**
 ```json
@@ -51,10 +42,7 @@ Contains all modules in the codebase.
       "interfaces": "Receives HTTP requests, calls auth module for authentication, calls service modules for business logic"
     }
   ],
-  "relationships": {
-    "diagram": "graph LR\n  api --> auth\n  api --> service\n  auth --> database\n  auth --> cache\n  service --> database\n  service --> cache",
-    "notes": "The api module is the main entry point. Auth failures short-circuit the request pipeline. Cache is optional - system degrades gracefully to database-only mode if Redis is unavailable. Service modules are stateless and horizontally scalable."
-  }
+  "relationships": "## Module Dependencies\n\n```mermaid\ngraph LR\n  api --> auth\n  api --> service\n  auth --> database\n  auth --> cache\n  service --> database\n  service --> cache\n```\n\n## Notes\n\n- The **api** module is the main entry point for all HTTP requests\n- Auth failures short-circuit the request pipeline immediately\n- Cache is optional - system degrades gracefully to database-only mode if Redis is unavailable\n- Service modules are stateless and horizontally scalable"
 }
 ```
 
