@@ -22,7 +22,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Printf("lightkeeper %s\n", Version)
+		fmt.Printf("memo %s\n", Version)
 		os.Exit(0)
 	}
 
@@ -45,12 +45,12 @@ func main() {
 	SetLogLevel(cfg.LogLevel)
 	logDebug("Config loaded: logLevel=%s, debounce=%dms, maxWait=%dms", cfg.LogLevel, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs)
 
-	// Initialize .baecon directory
-	baeconDir := filepath.Join(workDir, ".baecon")
-	if err := initBaecon(baeconDir); err != nil {
-		log.Fatalf("[ERROR] Failed to initialize .baecon: %v", err)
+	// Initialize .memo directory
+	memoDir := filepath.Join(workDir, ".memo")
+	if err := initMemo(memoDir); err != nil {
+		log.Fatalf("[ERROR] Failed to initialize .memo: %v", err)
 	}
-	logDebug("Initialized .baecon directory: %s", baeconDir)
+	logDebug("Initialized .memo directory: %s", memoDir)
 
 	// Create analyser
 	analyser := NewAnalyser(cfg, workDir)
@@ -69,7 +69,7 @@ func main() {
 	}
 	defer watcher.Close()
 
-	logInfo("Lightkeeper watching: %s", workDir)
+	logInfo("Memo watching: %s", workDir)
 
 	// Initial scan of all files
 	logInfo("Starting initial scan...")
@@ -90,7 +90,7 @@ func main() {
 	logInfo("Shutting down...")
 }
 
-func initBaecon(dir string) error {
+func initMemo(dir string) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}

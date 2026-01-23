@@ -1,11 +1,11 @@
 # Validation Failed - Please Fix
 
-The JSON files in `.baecon` failed schema validation. You must fix the errors.
+The JSON files in `.memo` failed schema validation. You must fix the errors.
 
 ## Instructions
 
 1. Read the validation errors below carefully
-2. Read the affected JSON files in `.baecon/`
+2. Read the affected JSON files in `.memo/`
 3. Fix the schema violations:
    - Missing required fields
    - Wrong data types

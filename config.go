@@ -40,7 +40,7 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.Watch.MaxWaitMs = 300000 // 5 minutes max wait
 	}
 	if len(cfg.Watch.IgnorePatterns) == 0 {
-		cfg.Watch.IgnorePatterns = []string{".git", "node_modules", ".baecon", "*.log"}
+		cfg.Watch.IgnorePatterns = []string{".git", "node_modules", ".memo", "*.log"}
 	}
 	return &cfg, nil
 }
