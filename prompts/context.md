@@ -21,11 +21,14 @@ Contains all modules in the codebase.
       "interfaces": "string - brief description of inputs/outputs and which modules it interacts with"
     }
   ],
-  "relationships": "string - use Mermaid flowchart syntax to describe module relationships (e.g. graph LR\\n  A --> B\\n  B --> C)"
+  "relationships": {
+    "diagram": "string - Mermaid flowchart syntax (e.g. graph LR\\n  A --> B)",
+    "notes": "string - free-form description for details that Mermaid cannot express"
+  }
 }
 ```
 
-**Mermaid Syntax Reference for relationships:**
+**Mermaid Syntax Reference for diagram:**
 - `graph LR` (left-to-right) or `graph TD` (top-down)
 - `A --> B` (A calls/depends on B)
 - `A <--> B` (bidirectional)
@@ -48,7 +51,10 @@ Contains all modules in the codebase.
       "interfaces": "Receives HTTP requests, calls auth module for authentication, calls service modules for business logic"
     }
   ],
-  "relationships": "graph LR\n  api --> auth\n  api --> service\n  auth --> database\n  auth --> cache\n  service --> database\n  service --> cache"
+  "relationships": {
+    "diagram": "graph LR\n  api --> auth\n  api --> service\n  auth --> database\n  auth --> cache\n  service --> database\n  service --> cache",
+    "notes": "The api module is the main entry point. Auth failures short-circuit the request pipeline. Cache is optional - system degrades gracefully to database-only mode if Redis is unavailable. Service modules are stateless and horizontally scalable."
+  }
 }
 ```
 

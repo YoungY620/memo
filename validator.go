@@ -26,7 +26,14 @@ var schemas = map[string]string{
 					"required": ["name", "description", "interfaces"]
 				}
 			},
-			"relationships": {"type": "string"}
+			"relationships": {
+				"type": "object",
+				"properties": {
+					"diagram": {"type": "string"},
+					"notes": {"type": "string"}
+				},
+				"required": ["diagram", "notes"]
+			}
 		},
 		"required": ["modules", "relationships"]
 	}`,
