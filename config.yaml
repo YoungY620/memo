@@ -1,8 +1,8 @@
-log_level: info # error, notice, info, debug
+log_level: debug # error, notice, info, debug
 
-agent:
-  api_key: "your-api-key-here"
-  model: "your-model"
+# agent:
+#   api_key: "your-api-key"  # optional, uses kimi default if not set
+#   model: "your-model"      # optional, uses kimi default if not set
 
 watch:
   ignore_patterns:
