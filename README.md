@@ -61,10 +61,15 @@ watch:
 
 Memo maintains `.memo/` directory with:
 
-- `arch.json` - Module definitions
-- `interface.json` - External/internal interfaces
-- `stories.json` - User stories and call chains
-- `issues.json` - Design decisions, TODOs, bugs
+```
+.memo/
+├── index/
+│   ├── arch.json       # Module definitions
+│   ├── interface.json  # External/internal interfaces
+│   ├── stories.json    # User stories and call chains
+│   └── issues.json     # Design decisions, TODOs, bugs
+└── config.yml          # Local repo configuration (reserved)
+```
 
 ## License
 

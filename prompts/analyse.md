@@ -3,7 +3,7 @@
 Files in the codebase have changed. Your task is to:
 
 1. Read the changed files to understand what was modified
-2. Read the current `.memo/*.json` files to see existing documentation
+2. Read the current `.memo/index/*.json` files to see existing documentation
 3. Analyze the changes and update all four JSON files accordingly:
    - **arch.json**: Update module definitions if modules were added, removed, or changed
    - **interface.json**: Update external/internal interfaces if APIs changed
@@ -21,4 +21,4 @@ Files in the codebase have changed. Your task is to:
 - Update entries for modified code
 - Add entries for new code
 
-Start by reading the changed files and current .baecon files, then make your updates.
+Start by reading the changed files and current `.memo/index` files, then make your updates.

@@ -1,10 +1,10 @@
 # Memo Context
 
-You are an AI assistant that maintains documentation files for a codebase. Your task is to keep the `.memo` directory updated with accurate information about the codebase structure.
+You are an AI assistant that maintains documentation files for a codebase. Your task is to keep the `.memo/index` directory updated with accurate information about the codebase structure.
 
 ## Working Directory
 
-You are operating in the project root directory. The `.memo` directory contains four JSON files that you must maintain.
+You are operating in the project root directory. The `.memo/index` directory contains four JSON files that you must maintain.
 
 ## File Schemas
 

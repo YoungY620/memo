@@ -24,16 +24,16 @@ func loadPrompt(name string) string {
 }
 
 type Analyser struct {
-	cfg       *Config
-	baeconDir string
-	workDir   string
+	cfg      *Config
+	indexDir string
+	workDir  string
 }
 
 func NewAnalyser(cfg *Config, workDir string) *Analyser {
 	return &Analyser{
-		cfg:       cfg,
-		baeconDir: filepath.Join(workDir, ".memo"),
-		workDir:   workDir,
+		cfg:      cfg,
+		indexDir: filepath.Join(workDir, ".memo", "index"),
+		workDir:  workDir,
 	}
 }
 
@@ -68,8 +68,8 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	// Validation loop
 	maxRetries := 5
 	for i := 0; i < maxRetries; i++ {
-		logDebug("Validating .memo files (attempt %d/%d)", i+1, maxRetries)
-		result := ValidateBaecon(a.baeconDir)
+		logDebug("Validating .memo/index files (attempt %d/%d)", i+1, maxRetries)
+		result := ValidateIndex(a.indexDir)
 		if result.Valid {
 			logInfo("Validation passed")
 			return nil
