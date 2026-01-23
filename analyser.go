@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	kimi "github.com/MoonshotAI/kimi-agent-sdk/go"
+	agent "github.com/MoonshotAI/kimi-agent-sdk/go"
 	"github.com/MoonshotAI/kimi-agent-sdk/go/wire"
 )
 
@@ -41,11 +41,11 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	logInfo("Starting analysis for %d files", len(changedFiles))
 	logDebug("Creating agent session with model: %s", a.cfg.Agent.Model)
 
-	session, err := kimi.NewSession(
-		kimi.WithAPIKey(a.cfg.Agent.APIKey),
-		kimi.WithModel(a.cfg.Agent.Model),
-		kimi.WithWorkDir(a.workDir),
-		kimi.WithAutoApprove(),
+	session, err := agent.NewSession(
+		agent.WithAPIKey(a.cfg.Agent.APIKey),
+		agent.WithModel(a.cfg.Agent.Model),
+		agent.WithWorkDir(a.workDir),
+		agent.WithAutoApprove(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
@@ -68,7 +68,7 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	// Validation loop
 	maxRetries := 5
 	for i := 0; i < maxRetries; i++ {
-		logDebug("Validating .baecon files (attempt %d/%d)", i+1, maxRetries)
+		logDebug("Validating .memo files (attempt %d/%d)", i+1, maxRetries)
 		result := ValidateBaecon(a.baeconDir)
 		if result.Valid {
 			logInfo("Validation passed")
@@ -91,7 +91,7 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	return fmt.Errorf("validation failed after %d attempts", maxRetries)
 }
 
-func (a *Analyser) runPrompt(ctx context.Context, session *kimi.Session, prompt string) error {
+func (a *Analyser) runPrompt(ctx context.Context, session *agent.Session, prompt string) error {
 	turn, err := session.Prompt(ctx, wire.NewStringContent(prompt))
 	if err != nil {
 		return fmt.Errorf("prompt failed: %w", err)
