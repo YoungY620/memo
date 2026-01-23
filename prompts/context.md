@@ -6,43 +6,98 @@ You are an AI assistant that maintains documentation files for a codebase. Your 
 
 You are operating in the project root directory. The `.memo/index` directory contains four JSON files that you must maintain.
 
-## File Schemas
+## File Schemas and Examples
 
 ### arch.json
 Contains all modules in the codebase.
 
+**Schema:**
 ```json
 {
   "modules": [
     {
-      "name": "module name",
-      "description": "what this module does",
-      "interfaces": "brief description of inputs/outputs and which modules it interacts with"
+      "name": "string - module/package name",
+      "description": "string - what this module does",
+      "interfaces": "string - brief description of inputs/outputs and which modules it interacts with"
     }
   ],
-  "relationships": "free-form description of how all components relate to each other"
+  "relationships": "string - free-form description of how all components relate to each other"
+}
+```
+
+**Example:**
+```json
+{
+  "modules": [
+    {
+      "name": "auth",
+      "description": "Handles user authentication and session management",
+      "interfaces": "Exposes login/logout APIs, interacts with database module for user storage and cache module for session tokens"
+    },
+    {
+      "name": "api",
+      "description": "REST API layer that handles HTTP requests and routing",
+      "interfaces": "Receives HTTP requests, calls auth module for authentication, calls service modules for business logic"
+    }
+  ],
+  "relationships": "The api module is the entry point that receives all HTTP requests. It delegates authentication to the auth module, which uses database for user lookup and cache for sessions. Business logic flows from api to service modules, which interact with database for persistence."
 }
 ```
 
 ### interface.json
 Contains all external and internal interfaces.
 
+**Schema:**
 ```json
 {
   "external": [
     {
-      "type": "cli|http|rest|graphql|grpc|websocket|sse|tcp|udp|unix_socket|ipc|pipe|shared_memory|signal|message_queue|kafka|rabbitmq|redis|mqtt|database|filesystem|env|stdin_stdout|ffi|plugin|dbus|rpc|callback|event_bus|other",
-      "name": "interface name or ID",
-      "params": "parameter requirements",
-      "description": "what this interface does"
+      "type": "string - cli|http|rest|graphql|grpc|websocket|sse|tcp|udp|unix_socket|ipc|pipe|shared_memory|signal|message_queue|kafka|rabbitmq|redis|mqtt|database|filesystem|env|stdin_stdout|ffi|plugin|dbus|rpc|callback|event_bus|other",
+      "name": "string - interface name or endpoint ID",
+      "params": "string - parameter requirements",
+      "description": "string - what this interface does"
     }
   ],
   "internal": [
     {
-      "type": "cli|http|rest|graphql|grpc|websocket|sse|tcp|udp|unix_socket|ipc|pipe|shared_memory|signal|message_queue|kafka|rabbitmq|redis|mqtt|database|filesystem|env|stdin_stdout|ffi|plugin|dbus|rpc|callback|event_bus|other",
-      "name": "interface name or ID",
-      "params": "parameter requirements",
-      "description": "what this interface does"
+      "type": "string - same types as external",
+      "name": "string - interface name or function signature",
+      "params": "string - parameter requirements",
+      "description": "string - what this interface does"
+    }
+  ]
+}
+```
+
+**Example:**
+```json
+{
+  "external": [
+    {
+      "type": "rest",
+      "name": "POST /api/v1/users",
+      "params": "body: {email: string, password: string, name?: string}",
+      "description": "Creates a new user account and returns user ID with auth token"
+    },
+    {
+      "type": "cli",
+      "name": "--config",
+      "params": "path to YAML config file",
+      "description": "Specifies custom configuration file location"
+    }
+  ],
+  "internal": [
+    {
+      "type": "callback",
+      "name": "auth.OnUserLogin(user User)",
+      "params": "user: authenticated User object",
+      "description": "Called by auth module when user successfully logs in, triggers session creation"
+    },
+    {
+      "type": "event_bus",
+      "name": "order.created",
+      "params": "payload: {orderId: string, userId: string, items: Item[]}",
+      "description": "Emitted when a new order is placed, consumed by notification and inventory modules"
     }
   ]
 }
@@ -51,13 +106,48 @@ Contains all external and internal interfaces.
 ### stories.json
 Contains user stories and call chains for understanding the system.
 
+**Schema:**
 ```json
 {
   "stories": [
     {
-      "title": "story title",
-      "tags": ["tag1", "tag2"],
-      "lines": ["line 1 of the story", "line 2 describing next step", "..."]
+      "title": "string - story title",
+      "tags": ["string - category tags"],
+      "lines": ["string - each line is one step in the story or call chain"]
+    }
+  ]
+}
+```
+
+**Example:**
+```json
+{
+  "stories": [
+    {
+      "title": "User Registration Flow",
+      "tags": ["user-story", "authentication", "onboarding"],
+      "lines": [
+        "1. User submits registration form with email and password",
+        "2. API validates input format and checks email uniqueness",
+        "3. Password is hashed using bcrypt with salt",
+        "4. User record is created in database with pending status",
+        "5. Verification email is sent via email service",
+        "6. User clicks verification link within 24 hours",
+        "7. Account status changes to active, user can now login"
+      ]
+    },
+    {
+      "title": "Request Processing Call Chain",
+      "tags": ["call-chain", "api", "middleware"],
+      "lines": [
+        "main.go: HTTP server receives request",
+        "middleware/auth.go: JWT token validated, user context attached",
+        "middleware/ratelimit.go: Rate limit checked against Redis",
+        "router/api.go: Route matched, handler function called",
+        "handler/users.go: Business logic executed",
+        "repository/user.go: Database query performed",
+        "Response serialized and returned to client"
+      ]
     }
   ]
 }
@@ -66,18 +156,63 @@ Contains user stories and call chains for understanding the system.
 ### issues.json
 Contains design decisions, TODOs, bugs, optimizations, compromises, and mocks.
 
+**Schema:**
 ```json
 {
   "issues": [
     {
-      "tags": ["design-decision", "todo", "bug", "optimization", "compromise", "mock"],
-      "title": "issue title",
-      "description": "brief description",
+      "tags": ["string - design-decision|todo|bug|optimization|compromise|mock|deprecated|security|performance"],
+      "title": "string - issue title",
+      "description": "string - brief description",
       "locations": [
         {
-          "file": "path/to/file",
-          "keyword": "grep-able keyword",
-          "line": 42
+          "file": "string - path/to/file",
+          "keyword": "string - grep-able keyword to find the location",
+          "line": "integer - line number"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Example:**
+```json
+{
+  "issues": [
+    {
+      "tags": ["design-decision", "security"],
+      "title": "JWT stored in httpOnly cookie instead of localStorage",
+      "description": "Chose httpOnly cookie over localStorage to prevent XSS attacks from accessing tokens. Trade-off: requires CSRF protection.",
+      "locations": [
+        {
+          "file": "middleware/auth.go",
+          "keyword": "httpOnly",
+          "line": 45
+        }
+      ]
+    },
+    {
+      "tags": ["todo", "optimization"],
+      "title": "Add Redis caching for user profile queries",
+      "description": "User profile is fetched on every request. Should cache in Redis with 5min TTL to reduce database load.",
+      "locations": [
+        {
+          "file": "repository/user.go",
+          "keyword": "GetUserProfile",
+          "line": 78
+        }
+      ]
+    },
+    {
+      "tags": ["mock", "compromise"],
+      "title": "Email service uses console output in development",
+      "description": "Real email provider not configured for local dev. Emails are printed to console instead of sent.",
+      "locations": [
+        {
+          "file": "service/email.go",
+          "keyword": "MOCK_EMAIL",
+          "line": 23
         }
       ]
     }
