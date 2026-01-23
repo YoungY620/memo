@@ -39,14 +39,26 @@ func NewAnalyser(cfg *Config, workDir string) *Analyser {
 
 func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	logInfo("Starting analysis for %d files", len(changedFiles))
-	logDebug("Creating agent session with model: %s", a.cfg.Agent.Model)
 
-	session, err := agent.NewSession(
-		agent.WithAPIKey(a.cfg.Agent.APIKey),
-		agent.WithModel(a.cfg.Agent.Model),
-		agent.WithWorkDir(a.workDir),
-		agent.WithAutoApprove(),
-	)
+	var session *agent.Session
+	var err error
+
+	// Use kimi defaults if agent config is not set
+	if a.cfg.Agent.APIKey != "" && a.cfg.Agent.Model != "" {
+		logDebug("Using configured model: %s", a.cfg.Agent.Model)
+		session, err = agent.NewSession(
+			agent.WithAPIKey(a.cfg.Agent.APIKey),
+			agent.WithModel(a.cfg.Agent.Model),
+			agent.WithWorkDir(a.workDir),
+			agent.WithAutoApprove(),
+		)
+	} else {
+		logDebug("Using kimi default configuration")
+		session, err = agent.NewSession(
+			agent.WithWorkDir(a.workDir),
+			agent.WithAutoApprove(),
+		)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
