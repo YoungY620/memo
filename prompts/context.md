@@ -21,11 +21,9 @@ Contains all modules in the codebase.
       "interfaces": "string - brief description of inputs/outputs and which modules it interacts with"
     }
   ],
-  "relationships": "string - markdown content with text and mermaid code blocks"
+  "relationships": "string - natural language description of how modules relate; optionally include mermaid diagram"
 }
 ```
-
-**Note:** The `relationships` field is a markdown string. Use `\\n` for newlines in JSON. You can mix free-form text with mermaid diagrams using triple backticks.
 
 **Example:**
 ```json
@@ -115,7 +113,7 @@ Contains user stories and call chains for understanding the system.
     {
       "title": "string - story title",
       "tags": ["string - category tags"],
-      "content": "string - markdown content with text and mermaid diagrams"
+      "content": "string - natural language description; optionally include mermaid diagram for complex flows"
     }
   ]
 }
@@ -128,12 +126,12 @@ Contains user stories and call chains for understanding the system.
     {
       "title": "User Registration Flow",
       "tags": ["user-story", "authentication", "onboarding"],
-      "content": "## Steps\n\n1. User submits registration form with email and password\n2. API validates input format and checks email uniqueness\n3. Password is hashed using bcrypt with salt\n4. User record is created in database with pending status\n5. Verification email is sent via email service\n6. User clicks verification link within 24 hours\n7. Account status changes to active, user can now login\n\n## Sequence Diagram\n\n```mermaid\nsequenceDiagram\n  User->>API: POST /register\n  API->>Database: Check email exists\n  Database-->>API: Not found\n  API->>Database: Create user (pending)\n  API->>EmailService: Send verification\n  API-->>User: 201 Created\n  User->>API: GET /verify?token=xxx\n  API->>Database: Update status (active)\n  API-->>User: 200 OK\n```"
+      "content": "User submits registration form with email and password. The API first validates input format, then checks if the email already exists in the database. If unique, the password is hashed using bcrypt with a random salt. A new user record is created with 'pending' status. The system sends a verification email containing a signed token valid for 24 hours. When the user clicks the verification link, the token is validated and the account status changes to 'active'. The user can now log in normally."
     },
     {
-      "title": "Request Processing Call Chain",
+      "title": "Request Processing Pipeline",
       "tags": ["call-chain", "api", "middleware"],
-      "content": "## Flow\n\n```mermaid\ngraph TD\n  A[HTTP Request] --> B[auth middleware]\n  B --> C[ratelimit middleware]\n  C --> D[router]\n  D --> E[handler]\n  E --> F[repository]\n  F --> G[database]\n  G --> F\n  F --> E\n  E --> H[HTTP Response]\n```\n\n## Details\n\n- **main.go**: HTTP server receives request\n- **middleware/auth.go**: JWT token validated, user context attached\n- **middleware/ratelimit.go**: Rate limit checked against Redis\n- **router/api.go**: Route matched, handler function called\n- **handler/users.go**: Business logic executed\n- **repository/user.go**: Database query performed"
+      "content": "HTTP requests enter through main.go where the server listens. The request passes through middleware in order: first auth.go validates the JWT token and attaches user context, then ratelimit.go checks request rate against Redis. The router matches the URL pattern and calls the appropriate handler. Handlers contain business logic and call repository functions for database operations. The response flows back through the middleware chain, where response headers and logging are added before sending to the client."
     }
   ]
 }
@@ -149,7 +147,7 @@ Contains design decisions, TODOs, bugs, optimizations, compromises, and mocks.
     {
       "tags": ["string - design-decision|todo|bug|optimization|compromise|mock|deprecated|security|performance"],
       "title": "string - issue title",
-      "description": "string - brief description",
+      "description": "string - natural language explanation of the issue, context, and implications",
       "locations": [
         {
           "file": "string - path/to/file",
@@ -169,7 +167,7 @@ Contains design decisions, TODOs, bugs, optimizations, compromises, and mocks.
     {
       "tags": ["design-decision", "security"],
       "title": "JWT stored in httpOnly cookie instead of localStorage",
-      "description": "Chose httpOnly cookie over localStorage to prevent XSS attacks from accessing tokens. Trade-off: requires CSRF protection.",
+      "description": "Chose httpOnly cookie over localStorage to prevent XSS attacks from accessing tokens. This means JavaScript cannot read the token, which blocks most token-stealing attacks. Trade-off: we now need CSRF protection since cookies are sent automatically. Implemented via SameSite=Strict and CSRF tokens on state-changing requests.",
       "locations": [
         {
           "file": "middleware/auth.go",
@@ -181,7 +179,7 @@ Contains design decisions, TODOs, bugs, optimizations, compromises, and mocks.
     {
       "tags": ["todo", "optimization"],
       "title": "Add Redis caching for user profile queries",
-      "description": "User profile is fetched on every request. Should cache in Redis with 5min TTL to reduce database load.",
+      "description": "User profile is fetched from database on every authenticated request for permission checking. This creates unnecessary database load. Should cache user profiles in Redis with 5-minute TTL. Cache invalidation needed on profile updates and permission changes.",
       "locations": [
         {
           "file": "repository/user.go",
@@ -193,7 +191,7 @@ Contains design decisions, TODOs, bugs, optimizations, compromises, and mocks.
     {
       "tags": ["mock", "compromise"],
       "title": "Email service uses console output in development",
-      "description": "Real email provider not configured for local dev. Emails are printed to console instead of sent.",
+      "description": "Real email provider (SendGrid) not configured for local development to avoid accidental sends and API costs. In dev mode, emails are printed to console instead. Check MOCK_EMAIL env var. Remember to test with real provider before production deployment.",
       "locations": [
         {
           "file": "service/email.go",
@@ -210,7 +208,8 @@ Contains design decisions, TODOs, bugs, optimizations, compromises, and mocks.
 
 1. You MUST use the available tools (read_file, write_file, bash, etc.) to read and modify files
 2. NEVER output JSON content directly - always use write_file tool to update the files
-3. Preserve existing valid content, only update what has changed
-4. Remove outdated or incorrect entries
-5. Add new entries for new code discoveries
+3. Preserve existing valid content
+4. Fix errors, update outdated entries, and add missing information promptly
+5. Remove entries for deleted code
 6. All JSON files must be valid and conform to their schemas
+7. **Prefer clear natural language** - write as if explaining to a colleague, not as structured data
