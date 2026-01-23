@@ -6,6 +6,7 @@ mcp/node_modules/
 dist/
 mcp/dist/
 indexer
+lightkeeper
 
 # IDE
 .idea/
