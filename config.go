@@ -19,6 +19,7 @@ type AgentConfig struct {
 type WatchConfig struct {
 	IgnorePatterns []string `yaml:"ignore_patterns"`
 	DebounceMs     int      `yaml:"debounce_ms"`
+	MaxWaitMs      int      `yaml:"max_wait_ms"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -32,7 +33,10 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	// defaults
 	if cfg.Watch.DebounceMs == 0 {
-		cfg.Watch.DebounceMs = 1000
+		cfg.Watch.DebounceMs = 5000 // 5 seconds quiet period
+	}
+	if cfg.Watch.MaxWaitMs == 0 {
+		cfg.Watch.MaxWaitMs = 300000 // 5 minutes max wait
 	}
 	if len(cfg.Watch.IgnorePatterns) == 0 {
 		cfg.Watch.IgnorePatterns = []string{".git", "node_modules", ".baecon", "*.log"}

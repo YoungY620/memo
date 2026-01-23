@@ -8,4 +8,5 @@ watch:
     - "node_modules"
     - ".baecon"
     - "*.log"
-  debounce_ms: 1000
+  debounce_ms: 5000    # 5s quiet period
+  max_wait_ms: 300000  # 5min max wait
