@@ -1,4 +1,4 @@
-module github.com/user/kimi-sdk-agent-indexer
+module github.com/YoungY620/lightkeeper
 
 go 1.25.5
 
