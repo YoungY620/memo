@@ -58,6 +58,9 @@ func main() {
 
 	log.Printf("Lightkeeper watching: %s", workDir)
 
+	// Initial scan of all files
+	watcher.ScanAll()
+
 	// Handle shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
