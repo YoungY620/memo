@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Moonshot AgentConfig `yaml:"moonshot"`
 	Watch    WatchConfig    `yaml:"watch"`
+	LogLevel string         `yaml:"log_level"` // error, notice, info, debug
 }
 
 type AgentConfig struct {
