@@ -20,6 +20,15 @@ curl -sSL https://raw.githubusercontent.com/YoungY620/memo/main/install.sh | bas
 
 Download from [Releases](https://github.com/YoungY620/memo/releases) and add to PATH.
 
+### Option 4: Build from source
+
+```bash
+git clone https://github.com/YoungY620/memo.git
+cd memo
+make build
+./memo --version
+```
+
 ## Usage
 
 ```bash
