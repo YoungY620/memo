@@ -20,5 +20,6 @@ build-all: clean
 clean:
 	rm -rf dist $(BINARY)
 
-install:
-	go install $(LDFLAGS) .
+install: build
+	sudo cp $(BINARY) /usr/local/bin/$(BINARY)
+	@echo "Installed $(BINARY) to /usr/local/bin"
