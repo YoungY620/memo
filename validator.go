@@ -120,11 +120,11 @@ type ValidationResult struct {
 	Errors []string
 }
 
-func ValidateBaecon(baeconDir string) ValidationResult {
+func ValidateIndex(indexDir string) ValidationResult {
 	var allErrors []string
 
 	for filename, schemaJSON := range schemas {
-		filePath := filepath.Join(baeconDir, filename)
+		filePath := filepath.Join(indexDir, filename)
 		data, err := os.ReadFile(filePath)
 		if err != nil {
 			allErrors = append(allErrors, fmt.Sprintf("%s: %v", filename, err))

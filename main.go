@@ -45,12 +45,12 @@ func main() {
 	SetLogLevel(cfg.LogLevel)
 	logDebug("Config loaded: logLevel=%s, debounce=%dms, maxWait=%dms", cfg.LogLevel, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs)
 
-	// Initialize .memo directory
-	memoDir := filepath.Join(workDir, ".memo")
-	if err := initMemo(memoDir); err != nil {
-		log.Fatalf("[ERROR] Failed to initialize .memo: %v", err)
+	// Initialize .memo/index directory
+	indexDir := filepath.Join(workDir, ".memo", "index")
+	if err := initIndex(indexDir); err != nil {
+		log.Fatalf("[ERROR] Failed to initialize .memo/index: %v", err)
 	}
-	logDebug("Initialized .memo directory: %s", memoDir)
+	logDebug("Initialized .memo/index directory: %s", indexDir)
 
 	// Create analyser
 	analyser := NewAnalyser(cfg, workDir)
@@ -90,8 +90,8 @@ func main() {
 	logInfo("Shutting down...")
 }
 
-func initMemo(dir string) error {
-	if err := os.MkdirAll(dir, 0755); err != nil {
+func initIndex(indexDir string) error {
+	if err := os.MkdirAll(indexDir, 0755); err != nil {
 		return err
 	}
 
@@ -103,7 +103,7 @@ func initMemo(dir string) error {
 	}
 
 	for name, content := range files {
-		path := filepath.Join(dir, name)
+		path := filepath.Join(indexDir, name)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			logDebug("Creating %s", path)
 			if err := os.WriteFile(path, []byte(content), 0644); err != nil {
