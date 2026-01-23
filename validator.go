@@ -26,14 +26,7 @@ var schemas = map[string]string{
 					"required": ["name", "description", "interfaces"]
 				}
 			},
-			"relationships": {
-				"type": "object",
-				"properties": {
-					"diagram": {"type": "string"},
-					"notes": {"type": "string"}
-				},
-				"required": ["diagram", "notes"]
-			}
+			"relationships": {"type": "string"}
 		},
 		"required": ["modules", "relationships"]
 	}`,
@@ -81,9 +74,9 @@ var schemas = map[string]string{
 					"properties": {
 						"title": {"type": "string"},
 						"tags": {"type": "array", "items": {"type": "string"}},
-						"lines": {"type": "array", "items": {"type": "string"}}
+						"content": {"type": "string"}
 					},
-					"required": ["title", "tags", "lines"]
+					"required": ["title", "tags", "content"]
 				}
 			}
 		},

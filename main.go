@@ -96,7 +96,7 @@ func initIndex(indexDir string) error {
 	}
 
 	files := map[string]string{
-		"arch.json":      `{"modules": [], "relationships": {"diagram": "", "notes": ""}}`,
+		"arch.json":      `{"modules": [], "relationships": ""}`,
 		"interface.json": `{"external": [], "internal": []}`,
 		"stories.json":   `{"stories": []}`,
 		"issues.json":    `{"issues": []}`,
