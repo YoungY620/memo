@@ -21,9 +21,17 @@ Contains all modules in the codebase.
       "interfaces": "string - brief description of inputs/outputs and which modules it interacts with"
     }
   ],
-  "relationships": "string - free-form description of how all components relate to each other"
+  "relationships": "string - use Mermaid flowchart syntax to describe module relationships (e.g. graph LR\\n  A --> B\\n  B --> C)"
 }
 ```
+
+**Mermaid Syntax Reference for relationships:**
+- `graph LR` (left-to-right) or `graph TD` (top-down)
+- `A --> B` (A calls/depends on B)
+- `A <--> B` (bidirectional)
+- `A -.-> B` (optional/async dependency)
+- `A ==> B` (strong dependency)
+- Use `\\n` for newlines in JSON string
 
 **Example:**
 ```json
@@ -40,7 +48,7 @@ Contains all modules in the codebase.
       "interfaces": "Receives HTTP requests, calls auth module for authentication, calls service modules for business logic"
     }
   ],
-  "relationships": "The api module is the entry point that receives all HTTP requests. It delegates authentication to the auth module, which uses database for user lookup and cache for sessions. Business logic flows from api to service modules, which interact with database for persistence."
+  "relationships": "graph LR\n  api --> auth\n  api --> service\n  auth --> database\n  auth --> cache\n  service --> database\n  service --> cache"
 }
 ```
 
