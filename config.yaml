@@ -1,4 +1,4 @@
-log_level: info  # error, notice, info, debug
+log_level: info # error, notice, info, debug
 
 agent:
   api_key: "your-api-key-here"
@@ -10,5 +10,5 @@ watch:
     - "node_modules"
     - ".memo"
     - "*.log"
-  debounce_ms: 5000    # 5s quiet period
-  max_wait_ms: 300000  # 5min max wait
+  debounce_ms: 5000
+  max_wait_ms: 300000
