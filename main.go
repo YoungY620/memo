@@ -18,6 +18,7 @@ func main() {
 		pathFlag    = flag.String("path", "", "Path to watch (default: current directory)")
 		configFlag  = flag.String("config", "config.yaml", "Path to config file")
 		versionFlag = flag.Bool("version", false, "Print version and exit")
+		onceFlag    = flag.Bool("once", false, "Run once and exit (no watch mode)")
 	)
 	flag.Parse()
 
@@ -75,12 +76,20 @@ func main() {
 	}
 	defer watcher.Close()
 
-	logInfo("Memo watching: %s", workDir)
-
 	// Initial scan of all files
 	logInfo("Starting initial scan...")
 	watcher.ScanAll()
 	logDebug("Initial scan completed")
+
+	// Once mode: flush and exit
+	if *onceFlag {
+		watcher.Flush()
+		logInfo("Once mode completed")
+		return
+	}
+
+	// Watch mode
+	logInfo("Memo watching: %s", workDir)
 
 	// Handle shutdown
 	sigChan := make(chan os.Signal, 1)

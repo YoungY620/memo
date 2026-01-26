@@ -128,15 +128,15 @@ func (w *Watcher) add(file string) {
 	if w.debounce != nil {
 		w.debounce.Stop()
 	}
-	w.debounce = time.AfterFunc(time.Duration(w.debounceMs)*time.Millisecond, w.flush)
+	w.debounce = time.AfterFunc(time.Duration(w.debounceMs)*time.Millisecond, w.Flush)
 
 	// Start max wait timer on first change
 	if first {
-		w.maxWait = time.AfterFunc(time.Duration(w.maxWaitMs)*time.Millisecond, w.flush)
+		w.maxWait = time.AfterFunc(time.Duration(w.maxWaitMs)*time.Millisecond, w.Flush)
 	}
 }
 
-func (w *Watcher) flush() {
+func (w *Watcher) Flush() {
 	w.mu.Lock()
 	if w.debounce != nil {
 		w.debounce.Stop()
