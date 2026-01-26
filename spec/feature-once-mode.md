@@ -1,27 +1,27 @@
 # Feature: Once Mode
 
-一次性扫描模式，执行初始化和分析后直接退出，不进入监听状态。
+Single scan mode: run initialization and analysis, then exit without entering watch mode.
 
-## 架构设计
+## Architecture
 
 ```
-正常模式:  ScanAll() → pending → timer → flush() → onChange
-once模式:  ScanAll() → pending → Flush() → onChange → exit
-                                    ↑
-                              直接调用，复用同一方法
+Normal mode:  ScanAll() → pending → timer → Flush() → onChange
+Once mode:    ScanAll() → pending → Flush() → onChange → exit
+                                      ↑
+                              Direct call, reuse same method
 ```
 
-**核心改动**：`flush()` → `Flush()`（公开化），两种模式复用。
+**Core change**: `flush()` → `Flush()` (make public), reused by both modes.
 
-## 涉及文件
+## Files
 
-| 文件 | 改动 |
-|------|------|
-| `watcher.go` | `flush()` 改为 `Flush()` |
-| `main.go` | 添加 `--once` flag，once 模式调用 `Flush()` 后退出 |
+| File | Change |
+|------|--------|
+| `watcher.go` | `flush()` → `Flush()` |
+| `main.go` | Add `--once` flag, call `Flush()` and exit in once mode |
 
 ## TODO
 
 - [x] `watcher.go`: `flush()` → `Flush()`
-- [x] `main.go`: 添加 `--once` flag 及分支逻辑
-- [x] 测试验证
+- [x] `main.go`: Add `--once` flag and branch logic
+- [x] Test verification
