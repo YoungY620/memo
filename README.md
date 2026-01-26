@@ -4,19 +4,19 @@ AI-powered codebase memory keeper. Watches file changes and maintains `.memo` do
 
 ## Installation
 
-### Option 1: go install (requires Go 1.21+)
+### Option 1: go install (requires Go 1.21+) (not available, because it's not a public github repo)
 
 ```bash
 go install github.com/YoungY620/memo@latest
 ```
 
-### Option 2: One-line install script
+### Option 2: One-line install script (not available, because it's not a public github repo)
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/YoungY620/memo/main/install.sh | bash
 ```
 
-### Option 3: Download binary
+### Option 3: Download binary (not available, because it's not a public github repo)
 
 Download from [Releases](https://github.com/YoungY620/memo/releases) and add to PATH.
 
