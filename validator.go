@@ -13,6 +13,17 @@ var schemas = map[string]string{
 	"arch.json": `{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
+		"definitions": {
+			"submodule": {
+				"type": "object",
+				"properties": {
+					"name": {"type": "string"},
+					"description": {"type": "string"},
+					"interfaces": {"type": "string"}
+				},
+				"required": ["name", "description", "interfaces"]
+			}
+		},
 		"properties": {
 			"modules": {
 				"type": "array",
@@ -21,7 +32,18 @@ var schemas = map[string]string{
 					"properties": {
 						"name": {"type": "string"},
 						"description": {"type": "string"},
-						"interfaces": {"type": "string"}
+						"interfaces": {"type": "string"},
+						"internal": {
+							"type": "object",
+							"properties": {
+								"submodules": {
+									"type": "array",
+									"items": {"$ref": "#/definitions/submodule"}
+								},
+								"relationships": {"type": "string"}
+							},
+							"required": ["submodules", "relationships"]
+						}
 					},
 					"required": ["name", "description", "interfaces"]
 				}
