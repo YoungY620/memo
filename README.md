@@ -52,10 +52,6 @@ Create `config.yaml`:
 ```yaml
 log_level: info  # error, notice, info, debug
 
-agent:
-  api_key: "your-api-key"
-  model: "your-model"
-
 watch:
   ignore_patterns:
     - ".git"
