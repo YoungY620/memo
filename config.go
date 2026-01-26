@@ -43,7 +43,7 @@ func LoadConfig(path string) (*Config, error) {
 
 	// Apply defaults
 	if cfg.Watch.DebounceMs == 0 {
-		cfg.Watch.DebounceMs = 5000 // 5 seconds quiet period
+		cfg.Watch.DebounceMs = 30000 // 30 seconds quiet period
 	}
 	if cfg.Watch.MaxWaitMs == 0 {
 		cfg.Watch.MaxWaitMs = 300000 // 5 minutes max wait

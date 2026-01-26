@@ -3,7 +3,7 @@
     {
       "tags": ["design-decision"],
       "title": "Debounce and max-wait for batching file changes",
-      "description": "File changes are batched using two timers: a debounce timer (default 5s) that resets on each new change, and a max-wait timer (default 5min) that forces a flush even if changes keep coming. This prevents excessive AI calls during rapid edits while ensuring changes aren't delayed indefinitely during continuous development.",
+      "description": "File changes are batched using two timers: a debounce timer (default 30s) that resets on each new change, and a max-wait timer (default 5min) that forces a flush even if changes keep coming. This prevents excessive AI calls during rapid edits while ensuring changes aren't delayed indefinitely during continuous development.",
       "locations": [
         {
           "file": "watcher.go",
@@ -298,6 +298,45 @@
           "file": "spec/arch-internal-submodules.md",
           "keyword": "testdata",
           "line": 69
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "MCP with Watcher mode via --mcp-with-watcher flag",
+      "description": "The --mcp-with-watcher flag runs MCP server + Watcher subprocess together. Architecture: (1) Default mode (no flag): Watcher only, (2) --mcp mode: MCP server only (requires existing index), (3) --mcp-with-watcher mode: spawns 'memo --path <workDir>' as subprocess with stdout/stderr set to nil, then runs MCP server on stdio. Signal handling (SIGINT/SIGTERM) kills the subprocess before exiting. The subprocess is also killed when the MCP server exits normally or with error.",
+      "locations": [
+        {
+          "file": "spec/feature-mcp-default.md",
+          "keyword": "--mcp-with-watcher",
+          "line": 3
+        },
+        {
+          "file": "main.go",
+          "keyword": "mcpWithWatcherFlag",
+          "line": 26
+        },
+        {
+          "file": "main.go",
+          "keyword": "cmd.Process.Kill",
+          "line": 62
+        }
+      ]
+    },
+    {
+      "tags": ["todo", "design-decision"],
+      "title": "Add concurrent analysis guard with mutex in watcher",
+      "description": "When multiple Flush() calls overlap (e.g., Timer1 triggers Flush() which starts a long-running Analyse(), then Timer2 triggers another Flush() before Timer1 finishes), both may try to write to index files simultaneously causing conflicts. The solution is to add an 'analysing sync.Mutex' to the Watcher struct and lock/unlock it at the start/end of Flush(). This ensures only one analysis runs at a time - subsequent Flush() calls will block until the previous one completes.",
+      "locations": [
+        {
+          "file": "spec/feature-concurrent-analysis-guard.md",
+          "keyword": "Concurrent Analysis Guard",
+          "line": 1
+        },
+        {
+          "file": "watcher.go",
+          "keyword": "Flush()",
+          "line": 139
         }
       ]
     }
