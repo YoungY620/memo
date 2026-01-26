@@ -1,1 +1,164 @@
-{"issues": []}
+{
+  "issues": [
+    {
+      "tags": ["design-decision"],
+      "title": "Debounce and max-wait for batching file changes",
+      "description": "File changes are batched using two timers: a debounce timer (default 5s) that resets on each new change, and a max-wait timer (default 5min) that forces a flush even if changes keep coming. This prevents excessive AI calls during rapid edits while ensuring changes aren't delayed indefinitely during continuous development.",
+      "locations": [
+        {
+          "file": "watcher.go",
+          "keyword": "debounce",
+          "line": 131
+        },
+        {
+          "file": "watcher.go",
+          "keyword": "maxWait",
+          "line": 135
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Validation loop with feedback prompts",
+      "description": "After the AI updates JSON files, a validation step checks schema compliance. If validation fails, the AI receives a feedback prompt with error details and gets up to 5 attempts to fix the issues. This self-healing approach improves reliability without human intervention.",
+      "locations": [
+        {
+          "file": "analyser.go",
+          "keyword": "maxRetries",
+          "line": 83
+        },
+        {
+          "file": "analyser.go",
+          "keyword": "feedbackPrompt",
+          "line": 94
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Optional agent configuration with kimi defaults",
+      "description": "The agent.api_key and agent.model fields are optional. If not provided, the kimi-agent-sdk uses its default configuration. This allows zero-config usage for users who have kimi CLI configured, while supporting custom models for advanced users.",
+      "locations": [
+        {
+          "file": "analyser.go",
+          "keyword": "kimi defaults",
+          "line": 57
+        },
+        {
+          "file": "config.yaml",
+          "keyword": "api_key",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Gitignore pattern merging for automatic exclusions",
+      "description": "The watcher automatically loads .gitignore patterns and merges them with configured ignore_patterns. This reduces configuration burden and ensures ignored files (like build artifacts, dependencies) are not watched or analyzed. Negation patterns (!pattern) are intentionally skipped as they add complexity.",
+      "locations": [
+        {
+          "file": "config.go",
+          "keyword": "MergeGitignore",
+          "line": 121
+        },
+        {
+          "file": "config.go",
+          "keyword": "negation",
+          "line": 84
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Embedded prompt files for distribution simplicity",
+      "description": "Prompts (context.md, analyse.md, feedback.md) are embedded into the binary using Go's embed directive. This allows single-binary distribution without needing to ship separate prompt files, at the cost of requiring a rebuild to change prompts.",
+      "locations": [
+        {
+          "file": "analyser.go",
+          "keyword": "embed",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Auto-approve mode for unattended operation",
+      "description": "The kimi-agent-sdk session is created with WithAutoApprove(), meaning all tool calls from the AI are automatically approved. This enables fully autonomous operation but means the AI has unrestricted access to the file system within the work directory.",
+      "locations": [
+        {
+          "file": "analyser.go",
+          "keyword": "WithAutoApprove",
+          "line": 54
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "LineBuffer for streaming output with 500ms timeout",
+      "description": "The analyser uses a LineBuffer to accumulate streamed AI output and flush on complete lines or after 500ms timeout. This produces cleaner debug logs with complete lines instead of fragmented tokens. The buffer force-flushes on step completion or StatusUpdate events to ensure no content is lost. See spec/line-buffer-design.md for full design rationale.",
+      "locations": [
+        {
+          "file": "analyser.go",
+          "keyword": "NewLineBuffer",
+          "line": 113
+        },
+        {
+          "file": "log.go",
+          "keyword": "LineBuffer",
+          "line": 54
+        },
+        {
+          "file": "spec/line-buffer-design.md",
+          "keyword": "LineBuffer",
+          "line": 44
+        }
+      ]
+    },
+    {
+      "tags": ["compromise"],
+      "title": "Simple pattern matching for ignore patterns",
+      "description": "The ignored() function uses basic string matching and wildcard suffix checking, not full glob/gitignore semantics. Patterns like **/ or complex negations are not fully supported. This is simpler and covers most use cases but may not match gitignore behavior exactly in edge cases.",
+      "locations": [
+        {
+          "file": "watcher.go",
+          "keyword": "ignored",
+          "line": 75
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Separation of prompts and design specs into distinct directories",
+      "description": "The project uses prompts/ for actual AI prompt templates (context.md, analyse.md, feedback.md) that are embedded in the binary, and spec/ for design specification documents that describe feature rationale and implementation details. This keeps operational files separate from documentation.",
+      "locations": [
+        {
+          "file": "prompts/context.md",
+          "keyword": "prompts",
+          "line": 1
+        },
+        {
+          "file": "spec/line-buffer-design.md",
+          "keyword": "设计文档",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Code as single source of truth with doc-sync tracking",
+      "description": "The context.md prompt establishes that code is the single source of truth - the AI should reflect actual code behavior, not what docs or comments claim. Additionally, the AI is restricted to only modifying .memo/index/*.json files and should use the 'outdated-docs' tag to track discrepancies between code and documentation rather than fixing external docs directly. This ensures documentation accuracy while preventing unintended modifications to the codebase.",
+      "locations": [
+        {
+          "file": "prompts/context.md",
+          "keyword": "single source of truth",
+          "line": 209
+        },
+        {
+          "file": "prompts/context.md",
+          "keyword": "outdated-docs",
+          "line": 211
+        }
+      ]
+    }
+  ]
+}

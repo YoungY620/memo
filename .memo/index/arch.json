@@ -1,1 +1,35 @@
-{"modules": [], "relationships": ""}
+{
+  "modules": [
+    {
+      "name": "main",
+      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo/index directory with empty JSON files if not present, creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM.",
+      "interfaces": "Receives CLI flags (--path, --config, --version). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan."
+    },
+    {
+      "name": "config",
+      "description": "Configuration management. Loads YAML config file with agent settings (API key, model), watch settings (ignore patterns, debounce/max-wait times), and log level. Also parses .gitignore and merges patterns into the ignore list.",
+      "interfaces": "LoadConfig(path) returns *Config. Config.MergeGitignore(workDir) merges .gitignore patterns. Used by main module at startup."
+    },
+    {
+      "name": "watcher",
+      "description": "File system watcher using fsnotify. Watches directories recursively, ignores files matching configured patterns, implements debouncing (quiet period) and max-wait logic to batch file change events before triggering analysis.",
+      "interfaces": "NewWatcher(root, ignore, debounceMs, maxWaitMs, onChange) creates watcher. ScanAll() queues all existing files. Run() starts event loop. Close() cleans up. Calls onChange callback with batched file list."
+    },
+    {
+      "name": "analyser",
+      "description": "AI-powered analysis engine. Uses kimi-agent-sdk to create a session, sends prompts (context + analyse) to the AI agent, and runs a validation loop with feedback prompts if the generated JSON files fail schema validation. Uses LineBuffer for clean streaming output.",
+      "interfaces": "NewAnalyser(cfg, workDir) creates analyser. Analyse(ctx, changedFiles) runs analysis with up to 5 retry attempts. Loads prompts from embedded prompts/*.md files. Calls ValidateIndex after each AI response. runPrompt(ctx, session, prompt) handles sending prompts and processing streamed responses with LineBuffer."
+    },
+    {
+      "name": "validator",
+      "description": "JSON schema validator for .memo/index files. Defines schemas for arch.json, interface.json, stories.json, and issues.json. Validates each file against its schema and reports errors.",
+      "interfaces": "ValidateIndex(indexDir) returns ValidationResult. FormatValidationErrors(result) formats errors as string. Called by analyser after each AI response."
+    },
+    {
+      "name": "log",
+      "description": "Logging utilities with four levels (error, notice, info, debug) and LineBuffer for streaming output. LineBuffer accumulates text and flushes on newlines, timeout (500ms), or when forced, producing cleaner logs with complete lines instead of fragmented tokens.",
+      "interfaces": "SetLogLevel(level) sets global log level. logError/logNotice/logInfo/logDebug functions for logging. NewLineBuffer(timeout) creates a buffer, Write(s) appends text, Flush(force) returns content to output."
+    }
+  ],
+  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> config\n  main --> watcher\n  main --> analyser\n  main --> log\n  config --> log\n  watcher --> log\n  analyser --> config\n  analyser --> validator\n  analyser --> log\n  analyser --> prompts[prompts/*.md]\n  analyser --> kimi-agent-sdk\n  validator --> gojsonschema\n  watcher --> fsnotify\n```\n\n## Directory Organization\n\n- **prompts/** - Embedded prompt templates used by the analyser (context.md, analyse.md, feedback.md)\n- **spec/** - Design specification documents for features and architecture decisions\n\n## Notes\n\n- **main** is the orchestrator that wires everything together\n- **watcher** operates independently, calling the onChange callback when files change\n- **analyser** is the core logic that invokes the AI agent and validates output\n- **validator** provides schema validation to ensure AI output is correct\n- **log** provides logging plus LineBuffer for streaming output handling\n- External dependencies: fsnotify (file watching), gojsonschema (validation), kimi-agent-sdk (AI agent)"
+}
