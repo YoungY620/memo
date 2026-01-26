@@ -206,10 +206,10 @@ Contains design decisions, TODOs, bugs, optimizations, compromises, and mocks.
 
 ## Important Rules
 
-1. You MUST use the available tools (read_file, write_file, bash, etc.) to read and modify files
-2. NEVER output JSON content directly - always use write_file tool to update the files
-3. Preserve existing valid content
-4. Fix errors, update outdated entries, and add missing information promptly
-5. Remove entries for deleted code
-6. All JSON files must be valid and conform to their schemas
-7. **Prefer clear natural language** - write as if explaining to a colleague, not as structured data
+1. **Code is the single source of truth** - always reflect actual code behavior, not what docs/comments claim
+2. **Only modify `.memo/index/*.json` files** - never touch any other files in the workspace (outdated docs may be kept for archival)
+3. **Track sync issues** - use `issues.json` with tags `["outdated-docs"]` or `["todo"]` to mark discrepancies between code and documentation
+4. Use tools (read_file, write_file, bash) to read and modify files - never output JSON directly
+5. Preserve existing valid content, remove entries only for deleted code
+6. All JSON must be valid and conform to schemas
+7. **Prefer clear natural language** - write as if explaining to a colleague

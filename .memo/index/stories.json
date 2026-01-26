@@ -1,1 +1,29 @@
-{"stories": []}
+{
+  "stories": [
+    {
+      "title": "Application Startup Flow",
+      "tags": ["call-chain", "initialization", "main"],
+      "content": "When memo starts, main.go parses CLI flags (--path, --config, --version). If --version is set, it prints version and exits. Otherwise, it determines the work directory (from --path or cwd), loads config.yaml via LoadConfig, and sets the log level. It then calls MergeGitignore to add .gitignore patterns to the ignore list. The initIndex function creates .memo/index directory with empty JSON files if they don't exist. Finally, it creates an Analyser and Watcher, calls watcher.ScanAll() to trigger initial analysis of all files, starts the watcher event loop in a goroutine, and waits for SIGINT/SIGTERM to shut down gracefully."
+    },
+    {
+      "title": "File Change Detection and Batching",
+      "tags": ["call-chain", "watcher", "debounce"],
+      "content": "The Watcher uses fsnotify to monitor all directories under the root (excluding ignored patterns). When a file event occurs (write/create/remove/rename), the watcher checks if the path is ignored. If not, it adds the file to a pending set and starts/resets a debounce timer (default 5 seconds). If no new changes occur within the debounce period, flush() is called. Alternatively, if changes keep coming, the max-wait timer (default 5 minutes) ensures flush() is eventually called. The flush function collects all pending files, clears the set, and calls the onChange callback with the file list."
+    },
+    {
+      "title": "AI Analysis and Validation Loop",
+      "tags": ["call-chain", "analyser", "validation"],
+      "content": "When the onChange callback fires, it calls analyser.Analyse with the list of changed files. The analyser creates a kimi-agent-sdk session (using configured API key/model or kimi defaults). It loads the context.md and analyse.md prompts, appends the list of changed files, and sends to the AI via runPrompt. The AI operates under a read-only workspace policy where it may ONLY modify the four .memo/index/*.json files and must never modify source code, documentation, or other files. The runPrompt method processes the streamed response using a LineBuffer (500ms timeout) to accumulate tokens into complete lines for cleaner debug output. It handles ApprovalRequest messages by auto-approving, ContentPart messages by buffering text, and StatusUpdate messages by force-flushing. After the AI completes, ValidateIndex checks all JSON files against their schemas. If validation passes, analysis is complete. If validation fails, the analyser loads context.md and feedback.md, appends the error messages, and sends another prompt to fix the issues. This retry loop continues up to 5 times before giving up."
+    },
+    {
+      "title": "Configuration and Gitignore Handling",
+      "tags": ["user-story", "config", "gitignore"],
+      "content": "Users configure memo via config.yaml with log level, optional agent credentials, and watch settings. The watch.ignore_patterns list specifies files/directories to ignore (defaults: .git, node_modules, .memo, *.log). If a .gitignore file exists in the watched directory, MergeGitignore parses it (skipping comments, empty lines, and negation patterns), normalizes patterns (removes leading/trailing slashes), and adds unique patterns to the ignore list. This ensures memo respects the project's existing gitignore rules without manual configuration."
+    },
+    {
+      "title": "Handling Documentation-Code Discrepancies",
+      "tags": ["user-story", "documentation", "sync-tracking"],
+      "content": "The AI agent follows a 'Code is Single Source of Truth' principle. When analyzing the codebase, if the agent discovers that documentation (README, comments, etc.) is outdated or doesn't match current code behavior, it does not modify the documentation. Instead, it adds an issue to issues.json with the 'outdated-docs' tag describing what's out of sync. This creates a record for maintainers to review while preserving potentially intentional historical documentation. Examples include: README claiming a feature exists that was removed, comments describing deprecated behavior, or configuration docs that don't reflect current defaults."
+    }
+  ]
+}

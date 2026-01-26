@@ -1,1 +1,84 @@
-{"external": [], "internal": []}
+{
+  "external": [
+    {
+      "type": "cli",
+      "name": "--path",
+      "params": "string: path to directory to watch",
+      "description": "Specifies the directory to watch for file changes. Defaults to current working directory if not provided."
+    },
+    {
+      "type": "cli",
+      "name": "--config",
+      "params": "string: path to YAML config file (default: config.yaml)",
+      "description": "Specifies the configuration file location. Config includes agent settings, watch settings, and log level."
+    },
+    {
+      "type": "cli",
+      "name": "--version",
+      "params": "none (boolean flag)",
+      "description": "Prints the version string and exits. Version is injected at build time via ldflags."
+    },
+    {
+      "type": "filesystem",
+      "name": "config.yaml",
+      "params": "YAML file with: log_level, agent.api_key, agent.model, watch.ignore_patterns, watch.debounce_ms, watch.max_wait_ms",
+      "description": "Main configuration file. Agent settings are optional (uses kimi defaults). Watch settings control file monitoring behavior."
+    },
+    {
+      "type": "filesystem",
+      "name": ".memo/index/*.json",
+      "params": "JSON files: arch.json, interface.json, stories.json, issues.json",
+      "description": "Output directory containing documentation files maintained by the AI agent. Created automatically on first run with empty structures."
+    },
+    {
+      "type": "filesystem",
+      "name": ".gitignore",
+      "params": "standard gitignore format",
+      "description": "If present in watched directory, patterns are merged into ignore_patterns to avoid watching ignored files."
+    }
+  ],
+  "internal": [
+    {
+      "type": "callback",
+      "name": "Watcher.onChange(files []string)",
+      "params": "files: list of absolute paths to changed files",
+      "description": "Callback function passed to NewWatcher. Called with batched file changes after debounce period expires or max-wait time is reached."
+    },
+    {
+      "type": "callback",
+      "name": "Analyser.Analyse(ctx, changedFiles []string)",
+      "params": "ctx: context for cancellation, changedFiles: list of changed file paths",
+      "description": "Main analysis entry point. Sends prompts to AI agent, validates output, retries with feedback on validation failures (up to 5 attempts)."
+    },
+    {
+      "type": "callback",
+      "name": "Analyser.runPrompt(ctx, session, prompt string) error",
+      "params": "ctx: context, session: agent session, prompt: text to send",
+      "description": "Sends a prompt to the agent session and processes the streamed response. Uses LineBuffer for buffering output, handles ApprovalRequest (auto-approve), ContentPart (text output), and StatusUpdate (step completion) messages."
+    },
+    {
+      "type": "callback",
+      "name": "ValidateIndex(indexDir string) ValidationResult",
+      "params": "indexDir: path to .memo/index directory",
+      "description": "Validates all four JSON files against their schemas. Returns Valid=true if all pass, or list of error strings."
+    },
+    {
+      "type": "callback",
+      "name": "Config.MergeGitignore(workDir string) error",
+      "params": "workDir: path to directory containing .gitignore",
+      "description": "Loads and parses .gitignore, merges unique patterns into Config.Watch.IgnorePatterns. Skips if no .gitignore exists."
+    },
+    {
+      "type": "callback",
+      "name": "NewLineBuffer(timeout time.Duration) *LineBuffer",
+      "params": "timeout: duration to wait before force-flushing incomplete lines",
+      "description": "Creates a LineBuffer that accumulates streamed text and flushes on newlines or timeout. Used by runPrompt to produce clean debug output."
+    },
+    {
+      "type": "callback",
+      "name": "LineBuffer.Flush(force bool) string",
+      "params": "force: if true, flush all content; if false, only flush complete lines or on timeout",
+      "description": "Returns buffered content ready for output. When force=false, buffers incomplete lines until newline arrives or timeout expires."
+    }
+  ]
+}

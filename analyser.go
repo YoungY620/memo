@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	agent "github.com/MoonshotAI/kimi-agent-sdk/go"
 	"github.com/MoonshotAI/kimi-agent-sdk/go/wire"
@@ -109,6 +110,8 @@ func (a *Analyser) runPrompt(ctx context.Context, session *agent.Session, prompt
 		return fmt.Errorf("prompt failed: %w", err)
 	}
 
+	lb := NewLineBuffer(500 * time.Millisecond)
+
 	// Consume all messages
 	for step := range turn.Steps {
 		for msg := range step.Messages {
@@ -118,9 +121,21 @@ func (a *Analyser) runPrompt(ctx context.Context, session *agent.Session, prompt
 				m.Respond(wire.ApprovalRequestResponseApprove)
 			case wire.ContentPart:
 				if m.Type == wire.ContentPartTypeText && m.Text.Valid {
-					logDebug("Agent output: %s", truncate(m.Text.Value, 100))
+					lb.Write(m.Text.Value)
+					if lines := lb.Flush(false); lines != "" {
+						logDebug("Agent output: %s", lines)
+					}
+				}
+			case wire.StatusUpdate:
+				// StatusUpdate usually means a generation round is complete
+				if lines := lb.Flush(true); lines != "" {
+					logDebug("Agent output: %s", lines)
 				}
 			}
+		}
+		// Step ended, force flush remaining content
+		if lines := lb.Flush(true); lines != "" {
+			logDebug("Agent output: %s", lines)
 		}
 	}
 
@@ -129,11 +144,4 @@ func (a *Analyser) runPrompt(ctx context.Context, session *agent.Session, prompt
 	}
 
 	return nil
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
 }

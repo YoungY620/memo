@@ -27,15 +27,21 @@ type WatchConfig struct {
 }
 
 func LoadConfig(path string) (*Config, error) {
+	cfg := &Config{}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		// Config file not found, use defaults
+	} else {
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			return nil, err
+		}
 	}
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
-	}
-	// defaults
+
+	// Apply defaults
 	if cfg.Watch.DebounceMs == 0 {
 		cfg.Watch.DebounceMs = 5000 // 5 seconds quiet period
 	}
@@ -45,7 +51,7 @@ func LoadConfig(path string) (*Config, error) {
 	if len(cfg.Watch.IgnorePatterns) == 0 {
 		cfg.Watch.IgnorePatterns = []string{".git", "node_modules", ".memo", "*.log"}
 	}
-	return &cfg, nil
+	return cfg, nil
 }
 
 // LoadGitignore parses a .gitignore file and returns the patterns.
