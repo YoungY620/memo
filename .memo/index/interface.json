@@ -56,6 +56,12 @@
     },
     {
       "type": "filesystem",
+      "name": ".memo/mcp.json",
+      "params": "JSON file with MCP server configurations (default: empty {})",
+      "description": "Local MCP configuration file for watcher sessions. Created automatically by initIndex() to prevent loading ~/.kimi/mcp.json (which may contain memo itself, causing infinite recursion). Users can customize this file to add MCP servers for watcher sessions."
+    },
+    {
+      "type": "filesystem",
       "name": ".gitignore",
       "params": "standard gitignore format",
       "description": "If present in watched directory, patterns are merged into ignore_patterns to avoid watching ignored files."
@@ -90,7 +96,7 @@
       "type": "callback",
       "name": "Analyser.Analyse(ctx, changedFiles []string)",
       "params": "ctx: context for cancellation, changedFiles: list of changed file paths",
-      "description": "Main analysis entry point. Sends prompts to AI agent, validates output, retries with feedback on validation failures (up to 5 attempts)."
+      "description": "Main analysis entry point. Creates a kimi-agent-sdk session using local MCP config (.memo/mcp.json) to prevent loading user's ~/.kimi/mcp.json. Sends prompts to AI agent, validates output, retries with feedback on validation failures (up to 5 attempts)."
     },
     {
       "type": "callback",

@@ -25,12 +25,12 @@
         {
           "file": "analyser.go",
           "keyword": "maxRetries",
-          "line": 82
+          "line": 88
         },
         {
           "file": "analyser.go",
           "keyword": "feedbackPrompt",
-          "line": 94
+          "line": 100
         }
       ]
     },
@@ -42,7 +42,7 @@
         {
           "file": "analyser.go",
           "keyword": "kimi defaults",
-          "line": 57
+          "line": 62
         },
         {
           "file": "config.yaml",
@@ -64,7 +64,7 @@
         {
           "file": "config.go",
           "keyword": "negation",
-          "line": 83
+          "line": 84
         }
       ]
     },
@@ -88,7 +88,7 @@
         {
           "file": "analyser.go",
           "keyword": "WithAutoApprove",
-          "line": 54
+          "line": 58
         }
       ]
     },
@@ -100,7 +100,7 @@
         {
           "file": "analyser.go",
           "keyword": "NewLineBuffer",
-          "line": 113
+          "line": 119
         },
         {
           "file": "log.go",
@@ -180,12 +180,12 @@
         {
           "file": "main.go",
           "keyword": "--once",
-          "line": 23
+          "line": 24
         },
         {
           "file": "main.go",
           "keyword": "onceFlag",
-          "line": 106
+          "line": 136
         },
         {
           "file": "watcher.go",
@@ -224,12 +224,12 @@
         {
           "file": "main.go",
           "keyword": "--mcp",
-          "line": 24
+          "line": 25
         },
         {
           "file": "main.go",
           "keyword": "mcp.Serve",
-          "line": 51
+          "line": 81
         },
         {
           "file": "spec/feature-mcp-query.md",
@@ -274,18 +274,6 @@
           "file": "mcp/server.go",
           "keyword": "tools()",
           "line": 109
-        }
-      ]
-    },
-    {
-      "tags": ["todo"],
-      "title": "MCP spec TODO items not yet completed",
-      "description": "The feature-mcp-query.md spec file has unchecked TODO items for query.go, query_test.go, server.go, and main.go integration. These items appear to be implemented based on the actual code, but the spec file's TODO list was not updated to reflect completion.",
-      "locations": [
-        {
-          "file": "spec/feature-mcp-query.md",
-          "keyword": "TODO",
-          "line": 149
         }
       ]
     },
@@ -337,6 +325,84 @@
           "file": "watcher.go",
           "keyword": "Flush()",
           "line": 139
+        }
+      ]
+    },
+    {
+      "tags": ["todo"],
+      "title": "Configurable LineBuffer timeout",
+      "description": "The spec/line-buffer-design.md mentions adding a configurable timeout parameter in config.yaml for the LineBuffer (output.line_buffer_timeout_ms). Currently the timeout is hardcoded to 500ms in analyser.go. This would allow users to tune the timeout for their environment.",
+      "locations": [
+        {
+          "file": "spec/line-buffer-design.md",
+          "keyword": "line_buffer_timeout_ms",
+          "line": 168
+        },
+        {
+          "file": "analyser.go",
+          "keyword": "500 * time.Millisecond",
+          "line": 119
+        }
+      ]
+    },
+    {
+      "tags": ["outdated-docs"],
+      "title": "README.md missing documentation for --once and --log-level flags",
+      "description": "The README.md Usage section documents --path, --config, and --version flags, and has an MCP Integration section for --mcp-with-watcher. However, it is missing documentation for: --once (one-shot mode for CI/CD) and --log-level (log verbosity override). These flags are implemented in main.go but not documented in the user-facing README.",
+      "locations": [
+        {
+          "file": "README.md",
+          "keyword": "## Usage",
+          "line": 32
+        },
+        {
+          "file": "main.go",
+          "keyword": "flag.Parse",
+          "line": 29
+        }
+      ]
+    },
+    {
+      "tags": ["outdated-docs"],
+      "title": "Go version inconsistency between version files",
+      "description": "The Go version is specified inconsistently across different files: .go-version says '1.25', .tool-versions says 'golang 1.25.6', and go.mod says 'go 1.25.5'. These should be aligned to avoid confusion for contributors setting up their development environment.",
+      "locations": [
+        {
+          "file": ".go-version",
+          "keyword": "1.25",
+          "line": 1
+        },
+        {
+          "file": ".tool-versions",
+          "keyword": "golang 1.25.6",
+          "line": 1
+        },
+        {
+          "file": "go.mod",
+          "keyword": "go 1.25.5",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Local MCP config to prevent infinite recursion",
+      "description": "To prevent infinite recursion when memo is configured in ~/.kimi/mcp.json, the analyser uses a local MCP config file (.memo/mcp.json) via WithMCPConfigFile(). This isolates the watcher's AI session from the user's global MCP config, preventing memo from recursively spawning itself. The .memo/mcp.json file is created by initIndex() in main.go and can be customized by users to add additional MCP servers for watcher sessions.",
+      "locations": [
+        {
+          "file": "spec/fix-mcp-infinite-recursion.md",
+          "keyword": "MCP Infinite Recursion",
+          "line": 1
+        },
+        {
+          "file": "analyser.go",
+          "keyword": "WithMCPConfigFile",
+          "line": 59
+        },
+        {
+          "file": "main.go",
+          "keyword": "mcp.json",
+          "line": 131
         }
       ]
     }

@@ -44,6 +44,10 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	var session *agent.Session
 	var err error
 
+	// Use local MCP config to prevent loading ~/.kimi/mcp.json
+	// (which may contain memo itself, causing infinite recursion)
+	mcpFile := filepath.Join(a.workDir, ".memo", "mcp.json")
+
 	// Use kimi defaults if agent config is not set
 	if a.cfg.Agent.APIKey != "" && a.cfg.Agent.Model != "" {
 		logDebug("Using configured model: %s", a.cfg.Agent.Model)
@@ -52,12 +56,14 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 			agent.WithModel(a.cfg.Agent.Model),
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
+			agent.WithMCPConfigFile(mcpFile),
 		)
 	} else {
 		logDebug("Using kimi default configuration")
 		session, err = agent.NewSession(
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
+			agent.WithMCPConfigFile(mcpFile),
 		)
 	}
 	if err != nil {
