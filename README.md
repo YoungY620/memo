@@ -107,6 +107,22 @@ This way you can monitor the watcher's real-time analysis output while Kimi CLI 
 
 The `--mcp-with-watcher` flag runs both the MCP server and file watcher together. This is convenient but hides watcher output, making it harder to diagnose issues.
 
+### Testing
+
+To verify the MCP integration is working:
+
+1. Open a new Kimi CLI session in your project directory:
+   ```bash
+   kimi
+   ```
+
+2. Ask Kimi to summarize the repo:
+   ```
+   Summarize this repo for me
+   ```
+
+Kimi should use the `memo_list_keys` and `memo_get_value` tools to read the `.memo/index` files and provide a summary.
+
 ## Output
 
 Memo maintains `.memo/` directory with:
