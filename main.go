@@ -45,6 +45,12 @@ func main() {
 	SetLogLevel(cfg.LogLevel)
 	logDebug("Config loaded: logLevel=%s, debounce=%dms, maxWait=%dms", cfg.LogLevel, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs)
 
+	// Merge .gitignore patterns if found
+	if err := cfg.MergeGitignore(workDir); err != nil {
+		logError("Failed to load .gitignore: %v", err)
+	}
+	logDebug("Total ignore patterns: %d", len(cfg.Watch.IgnorePatterns))
+
 	// Initialize .memo/index directory
 	indexDir := filepath.Join(workDir, ".memo", "index")
 	if err := initIndex(indexDir); err != nil {
