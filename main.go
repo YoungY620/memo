@@ -9,6 +9,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+
+	"github.com/YoungY620/memo/mcp"
 )
 
 var Version = "dev"
@@ -19,6 +21,7 @@ func main() {
 		configFlag   = flag.String("config", "config.yaml", "Path to config file")
 		versionFlag  = flag.Bool("version", false, "Print version and exit")
 		onceFlag     = flag.Bool("once", false, "Run once and exit (no watch mode)")
+		mcpFlag      = flag.Bool("mcp", false, "Run as MCP server (stdio)")
 		logLevelFlag = flag.String("log-level", "", "Log level: error, notice, info, debug")
 	)
 	flag.Parse()
@@ -38,6 +41,18 @@ func main() {
 		}
 	}
 	workDir, _ = filepath.Abs(workDir)
+
+	// MCP server mode
+	if *mcpFlag {
+		indexDir := filepath.Join(workDir, ".memo", "index")
+		if _, err := os.Stat(indexDir); os.IsNotExist(err) {
+			log.Fatalf("[ERROR] Index directory not found: %s\nRun 'memo' first to initialize the index.", indexDir)
+		}
+		if err := mcp.Serve(workDir); err != nil {
+			log.Fatalf("[ERROR] MCP server error: %v", err)
+		}
+		return
+	}
 
 	// Load config
 	cfg, err := LoadConfig(*configFlag)

@@ -180,12 +180,12 @@
         {
           "file": "main.go",
           "keyword": "--once",
-          "line": 21
+          "line": 23
         },
         {
           "file": "main.go",
           "keyword": "onceFlag",
-          "line": 91
+          "line": 106
         },
         {
           "file": "watcher.go",
@@ -213,6 +213,91 @@
           "file": "spec/feature-thorough-analysis.md",
           "keyword": "Thorough Analysis",
           "line": 1
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "MCP mode as separate read-only process",
+      "description": "MCP mode runs as a separate process from the watcher, sharing the same .memo/index directory. This separation of concerns means: (1) the watcher maintains the index, (2) MCP provides read-only queries. MCP mode requires existing index and exits with error if not found. This architecture allows running multiple MCP servers against the same index or running MCP without a watcher if manual updates are preferred.",
+      "locations": [
+        {
+          "file": "main.go",
+          "keyword": "--mcp",
+          "line": 24
+        },
+        {
+          "file": "main.go",
+          "keyword": "mcp.Serve",
+          "line": 51
+        },
+        {
+          "file": "spec/feature-mcp-query.md",
+          "keyword": "MCP server mode",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision", "security"],
+      "title": "State machine parser for MCP path queries with strict validation",
+      "description": "The MCP query path parser uses a state machine design to handle bracket notation like [arch][modules][0]. It includes security measures: (1) allowed files whitelist (arch, interface, stories, issues), (2) key length limit (100 chars), (3) control character rejection, (4) proper escape sequence handling (\\[, \\], \\\\). This prevents path injection attacks and ensures only valid index files can be accessed.",
+      "locations": [
+        {
+          "file": "mcp/query.go",
+          "keyword": "ParsePath",
+          "line": 41
+        },
+        {
+          "file": "mcp/query.go",
+          "keyword": "allowedFiles",
+          "line": 32
+        },
+        {
+          "file": "mcp/query.go",
+          "keyword": "validateKey",
+          "line": 127
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "MCP tools include schema in description for LLM context",
+      "description": "The memo_list_keys and memo_get_value tool descriptions include a summary of the JSON schema for each file type. This provides LLMs with context about what data is available without needing to query first, enabling more efficient navigation of the index.",
+      "locations": [
+        {
+          "file": "mcp/server.go",
+          "keyword": "schemaDesc",
+          "line": 103
+        },
+        {
+          "file": "mcp/server.go",
+          "keyword": "tools()",
+          "line": 109
+        }
+      ]
+    },
+    {
+      "tags": ["todo"],
+      "title": "MCP spec TODO items not yet completed",
+      "description": "The feature-mcp-query.md spec file has unchecked TODO items for query.go, query_test.go, server.go, and main.go integration. These items appear to be implemented based on the actual code, but the spec file's TODO list was not updated to reflect completion.",
+      "locations": [
+        {
+          "file": "spec/feature-mcp-query.md",
+          "keyword": "TODO",
+          "line": 149
+        }
+      ]
+    },
+    {
+      "tags": ["todo"],
+      "title": "arch.json internal submodules testdata not added",
+      "description": "The spec/arch-internal-submodules.md spec has an unchecked TODO item for adding testdata test cases for the internal submodules schema. The schema and validator changes were completed, but test data was not added.",
+      "locations": [
+        {
+          "file": "spec/arch-internal-submodules.md",
+          "keyword": "testdata",
+          "line": 69
         }
       ]
     }

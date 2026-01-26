@@ -2,8 +2,8 @@
   "modules": [
     {
       "name": "main",
-      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo/index directory with empty JSON files if not present, creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports two modes: watch mode (default) for continuous monitoring, and once mode (--once) for one-shot analysis.",
-      "interfaces": "Receives CLI flags (--path, --config, --version, --once, --log-level). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in watch mode, starts watcher.Run() and waits for shutdown signal."
+      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo/index directory with empty JSON files if not present, creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports three modes: watch mode (default) for continuous monitoring, once mode (--once) for one-shot analysis, and MCP mode (--mcp) for read-only index queries via stdio.",
+      "interfaces": "Receives CLI flags (--path, --config, --version, --once, --mcp, --log-level). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in MCP mode, calls mcp.Serve() and exits; in watch mode, starts watcher.Run() and waits for shutdown signal."
     },
     {
       "name": "config",
@@ -29,7 +29,27 @@
       "name": "log",
       "description": "Logging utilities with four levels (error, notice, info, debug) and LineBuffer for streaming output. LineBuffer accumulates text and flushes on newlines, timeout (500ms), or when forced, producing cleaner logs with complete lines instead of fragmented tokens.",
       "interfaces": "SetLogLevel(level) sets global log level. logError/logNotice/logInfo/logDebug functions for logging. NewLineBuffer(timeout) creates a buffer, Write(s) appends text, Flush(force) returns content to output."
+    },
+    {
+      "name": "mcp",
+      "description": "MCP (Model Context Protocol) server that exposes .memo/index/*.json via safe JSON path query. Provides read-only access to the documentation index via stdio-based JSON-RPC 2.0 protocol. Only starts when --mcp flag is set, and requires existing index (created by watcher mode).",
+      "interfaces": "Serve(workDir) starts the MCP server and blocks. Exposes two tools: memo_list_keys (returns keys for dict or length for list) and memo_get_value (returns JSON value at path). Used by main when --mcp flag is set.",
+      "internal": {
+        "submodules": [
+          {
+            "name": "server",
+            "description": "MCP stdio server handling JSON-RPC 2.0 protocol. Implements initialize, notifications/initialized, tools/list, and tools/call methods. Returns server capabilities and tool definitions.",
+            "interfaces": "NewServer(workDir) creates server with indexDir path. Run() starts event loop reading newline-delimited JSON from stdin. tools() returns Tool definitions with schemas."
+          },
+          {
+            "name": "query",
+            "description": "Path parser (state machine) and query executor. Parses bracket notation paths like [arch][modules][0][name], validates against allowed files (arch, interface, stories, issues), supports escape sequences for special characters, and traverses JSON data structures.",
+            "interfaces": "ParsePath(path) parses and validates path, returns file name and PathSegment slice. ListKeys(indexDir, path) returns ListKeysResult with type/keys/length. GetValue(indexDir, path) returns GetValueResult with JSON string."
+          }
+        ],
+        "relationships": "server → query: handleToolCall() uses ListKeys() and GetValue() which internally call ParsePath(), loadFile(), and traverse()"
+      }
     }
   ],
-  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> config\n  main --> watcher\n  main --> analyser\n  main --> log\n  config --> log\n  watcher --> log\n  analyser --> config\n  analyser --> validator\n  analyser --> log\n  analyser --> prompts[prompts/*.md]\n  analyser --> kimi-agent-sdk\n  validator --> gojsonschema\n  watcher --> fsnotify\n```\n\n## Directory Organization\n\n- **prompts/** - Embedded prompt templates used by the analyser (context.md, analyse.md, feedback.md)\n- **spec/** - Design specification documents for features and architecture decisions\n\n## Notes\n\n- **main** is the orchestrator that wires everything together\n- **watcher** operates independently, calling the onChange callback when files change\n- **analyser** is the core logic that invokes the AI agent and validates output\n- **validator** provides schema validation to ensure AI output is correct\n- **log** provides logging plus LineBuffer for streaming output handling\n- External dependencies: fsnotify (file watching), gojsonschema (validation), kimi-agent-sdk (AI agent)"
+  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> config\n  main --> watcher\n  main --> analyser\n  main --> mcp\n  main --> log\n  config --> log\n  watcher --> log\n  analyser --> config\n  analyser --> validator\n  analyser --> log\n  analyser --> prompts[prompts/*.md]\n  analyser --> kimi-agent-sdk\n  validator --> gojsonschema\n  watcher --> fsnotify\n  mcp --> .memo/index\n```\n\n## Directory Organization\n\n- **prompts/** - Embedded prompt templates used by the analyser (context.md, analyse.md, feedback.md)\n- **spec/** - Design specification documents for features and architecture decisions\n- **mcp/** - MCP server package for read-only index queries\n\n## Notes\n\n- **main** is the orchestrator that wires everything together and selects mode (watch/once/mcp)\n- **watcher** operates independently, calling the onChange callback when files change\n- **analyser** is the core logic that invokes the AI agent and validates output\n- **validator** provides schema validation to ensure AI output is correct\n- **log** provides logging plus LineBuffer for streaming output handling\n- **mcp** provides read-only query interface to the index via MCP protocol\n- External dependencies: fsnotify (file watching), gojsonschema (validation), kimi-agent-sdk (AI agent)"
 }

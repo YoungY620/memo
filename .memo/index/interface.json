@@ -26,6 +26,12 @@
     },
     {
       "type": "cli",
+      "name": "--mcp",
+      "params": "none (boolean flag)",
+      "description": "Runs as MCP (Model Context Protocol) server mode. Provides read-only JSON path query access to .memo/index files via stdio-based JSON-RPC 2.0 protocol. Requires existing index (created by watcher mode). Does NOT create or update the index."
+    },
+    {
+      "type": "cli",
       "name": "--log-level",
       "params": "string: error, notice, info, or debug",
       "description": "Overrides the log level from config file. Takes precedence over config.yaml log_level setting."
@@ -47,6 +53,18 @@
       "name": ".gitignore",
       "params": "standard gitignore format",
       "description": "If present in watched directory, patterns are merged into ignore_patterns to avoid watching ignored files."
+    },
+    {
+      "type": "rpc",
+      "name": "memo_list_keys",
+      "params": "path: string - JSON path like [arch][modules][0]",
+      "description": "MCP tool that lists available keys at a path in .memo/index JSON files. Returns {type: 'dict'|'list', keys?: [...], length?: N}. For dicts returns keys array, for lists returns length."
+    },
+    {
+      "type": "rpc",
+      "name": "memo_get_value",
+      "params": "path: string - JSON path like [arch][modules][0][name]",
+      "description": "MCP tool that gets the JSON value at a path in .memo/index files. Returns {value: '<JSON string>'}. Supports traversing nested objects and arrays."
     }
   ],
   "internal": [
@@ -97,6 +115,30 @@
       "name": "LineBuffer.Flush(force bool) string",
       "params": "force: if true, flush all content; if false, only flush complete lines or on timeout",
       "description": "Returns buffered content ready for output. When force=false, buffers incomplete lines until newline arrives or timeout expires."
+    },
+    {
+      "type": "callback",
+      "name": "mcp.Serve(workDir string) error",
+      "params": "workDir: path to project root containing .memo/index",
+      "description": "Starts the MCP server and blocks. Reads JSON-RPC 2.0 requests from stdin, dispatches to tool handlers, writes responses to stdout. Called by main when --mcp flag is set."
+    },
+    {
+      "type": "callback",
+      "name": "mcp.ParsePath(path string) (file, segments, error)",
+      "params": "path: bracket-notation path like [arch][modules][0]",
+      "description": "State machine parser for JSON paths. Validates file name (must be arch/interface/stories/issues), supports escape sequences (\\[, \\], \\\\), returns file name and PathSegment slice for traversal."
+    },
+    {
+      "type": "callback",
+      "name": "mcp.ListKeys(indexDir, path string) (*ListKeysResult, error)",
+      "params": "indexDir: path to .memo/index, path: bracket-notation path",
+      "description": "Returns type (dict/list), keys for dicts or length for lists at the given path. Used by memo_list_keys tool."
+    },
+    {
+      "type": "callback",
+      "name": "mcp.GetValue(indexDir, path string) (*GetValueResult, error)",
+      "params": "indexDir: path to .memo/index, path: bracket-notation path",
+      "description": "Returns JSON-marshaled value at the given path. Used by memo_get_value tool."
     }
   ]
 }
