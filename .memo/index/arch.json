@@ -2,8 +2,8 @@
   "modules": [
     {
       "name": "main",
-      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo/index directory with empty JSON files if not present, creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM.",
-      "interfaces": "Receives CLI flags (--path, --config, --version). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan."
+      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo/index directory with empty JSON files if not present, creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports two modes: watch mode (default) for continuous monitoring, and once mode (--once) for one-shot analysis.",
+      "interfaces": "Receives CLI flags (--path, --config, --version, --once). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in watch mode, starts watcher.Run() and waits for shutdown signal."
     },
     {
       "name": "config",
@@ -13,7 +13,7 @@
     {
       "name": "watcher",
       "description": "File system watcher using fsnotify. Watches directories recursively, ignores files matching configured patterns, implements debouncing (quiet period) and max-wait logic to batch file change events before triggering analysis.",
-      "interfaces": "NewWatcher(root, ignore, debounceMs, maxWaitMs, onChange) creates watcher. ScanAll() queues all existing files. Run() starts event loop. Close() cleans up. Calls onChange callback with batched file list."
+      "interfaces": "NewWatcher(root, ignore, debounceMs, maxWaitMs, onChange) creates watcher. ScanAll() queues all existing files. Flush() triggers the onChange callback with pending files (used by once mode or timers). Run() starts event loop. Close() cleans up. Calls onChange callback with batched file list."
     },
     {
       "name": "analyser",

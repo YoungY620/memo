@@ -171,6 +171,33 @@
           "line": 14
         }
       ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Once Mode for one-shot scanning via public Flush()",
+      "description": "The 'once mode' feature performs a single scan and analysis, then exits without entering the watch loop. This is useful for CI/CD pipelines or one-time documentation generation. The key design choice was to make flush() public as Flush(), allowing both normal mode (timer-triggered) and once mode (direct call from main.go after ScanAll) to reuse the same logic. The flow in once mode is: ScanAll() → pending → Flush() → onChange → exit. See spec/feature-once-mode.md for the architecture diagram.",
+      "locations": [
+        {
+          "file": "main.go",
+          "keyword": "--once",
+          "line": 21
+        },
+        {
+          "file": "main.go",
+          "keyword": "onceFlag",
+          "line": 85
+        },
+        {
+          "file": "watcher.go",
+          "keyword": "Flush()",
+          "line": 139
+        },
+        {
+          "file": "spec/feature-once-mode.md",
+          "keyword": "Once mode",
+          "line": 9
+        }
+      ]
     }
   ]
 }
