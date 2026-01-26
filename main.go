@@ -15,10 +15,11 @@ var Version = "dev"
 
 func main() {
 	var (
-		pathFlag    = flag.String("path", "", "Path to watch (default: current directory)")
-		configFlag  = flag.String("config", "config.yaml", "Path to config file")
-		versionFlag = flag.Bool("version", false, "Print version and exit")
-		onceFlag    = flag.Bool("once", false, "Run once and exit (no watch mode)")
+		pathFlag     = flag.String("path", "", "Path to watch (default: current directory)")
+		configFlag   = flag.String("config", "config.yaml", "Path to config file")
+		versionFlag  = flag.Bool("version", false, "Print version and exit")
+		onceFlag     = flag.Bool("once", false, "Run once and exit (no watch mode)")
+		logLevelFlag = flag.String("log-level", "", "Log level: error, notice, info, debug")
 	)
 	flag.Parse()
 
@@ -43,7 +44,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("[ERROR] Failed to load config: %v", err)
 	}
-	SetLogLevel(cfg.LogLevel)
+	// Set log level: flag takes precedence over config
+	if *logLevelFlag != "" {
+		SetLogLevel(*logLevelFlag)
+	} else {
+		SetLogLevel(cfg.LogLevel)
+	}
 	logDebug("Config loaded: logLevel=%s, debounce=%dms, maxWait=%dms", cfg.LogLevel, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs)
 
 	// Merge .gitignore patterns if found
