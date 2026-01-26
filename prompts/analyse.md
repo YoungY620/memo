@@ -1,19 +1,46 @@
 # Analysis Task
 
-Files in the codebase have changed. Your task is to:
+Files in the codebase have changed. Your task is to read all changed files and update `.memo/index/*.json` accordingly.
 
-1. Read the changed files to understand what was modified
-2. Read the current `.memo/index/*.json` files to see existing documentation
-3. Analyze the changes and update all four JSON files accordingly:
-   - **arch.json**: Update module definitions if modules were added, removed, or changed
-   - **interface.json**: Update external/internal interfaces if APIs changed
-   - **stories.json**: Update user stories or call chains if workflows changed
-   - **issues.json**: Update issues, TODOs, design decisions found in the code
+## Step 1: Create Todo List
 
-4. Use write_file to save your changes to each JSON file
+First, create a fine-grained todo list with **one item per changed file**, grouped by module/directory:
 
-## Guidelines
+```
+Example:
+- [ ] Read src/auth/login.go
+- [ ] Read src/auth/logout.go
+- [ ] Read src/auth/token.go
+- [ ] Update index for auth module
+- [ ] Read src/api/handler.go
+- [ ] Read src/api/router.go
+- [ ] Update index for api module
+- [ ] Final validation
+```
 
+## Step 2: Process Module by Module
+
+For each module group:
+
+1. **Read each file** in the module one by one, mark as done after reading
+2. **After all files in module are read**, update the relevant index files:
+   - `arch.json`: Module definitions
+   - `interface.json`: External/internal interfaces
+   - `stories.json`: User stories, call chains
+   - `issues.json`: TODOs, design decisions, bugs
+3. Mark module update as done
+
+## Step 3: Final Validation
+
+After all modules processed:
+1. Read all `.memo/index/*.json` files
+2. Verify consistency and completeness
+3. Fix any issues found
+
+## Rules
+
+- **Read every single changed file** - do not skip any
+- **Mark todo items as you progress** - this ensures nothing is missed
 - Be thorough but concise in descriptions
 - Use grep-able keywords for issue locations
 - Include accurate line numbers for issues
@@ -21,4 +48,4 @@ Files in the codebase have changed. Your task is to:
 - Update entries for modified code
 - Add entries for new code
 
-Start by reading the changed files and current `.memo/index` files, then make your updates.
+Start now: Create your todo list from the changed files below, then process module by module.

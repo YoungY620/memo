@@ -3,7 +3,7 @@
     {
       "name": "main",
       "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo/index directory with empty JSON files if not present, creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports two modes: watch mode (default) for continuous monitoring, and once mode (--once) for one-shot analysis.",
-      "interfaces": "Receives CLI flags (--path, --config, --version, --once). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in watch mode, starts watcher.Run() and waits for shutdown signal."
+      "interfaces": "Receives CLI flags (--path, --config, --version, --once, --log-level). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in watch mode, starts watcher.Run() and waits for shutdown signal."
     },
     {
       "name": "config",

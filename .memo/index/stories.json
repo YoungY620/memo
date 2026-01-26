@@ -3,7 +3,7 @@
     {
       "title": "Application Startup Flow",
       "tags": ["call-chain", "initialization", "main"],
-      "content": "When memo starts, main.go parses CLI flags (--path, --config, --version, --once). If --version is set, it prints version and exits. Otherwise, it determines the work directory (from --path or cwd), loads config.yaml via LoadConfig, and sets the log level. It then calls MergeGitignore to add .gitignore patterns to the ignore list. The initIndex function creates .memo/index directory with empty JSON files if they don't exist. Finally, it creates an Analyser and Watcher, calls watcher.ScanAll() to trigger initial analysis of all files. If --once flag is set, it calls Flush() directly and exits; otherwise it starts the watcher event loop in a goroutine and waits for SIGINT/SIGTERM to shut down gracefully."
+      "content": "When memo starts, main.go parses CLI flags (--path, --config, --version, --once, --log-level). If --version is set, it prints version and exits. Otherwise, it determines the work directory (from --path or cwd), loads config.yaml via LoadConfig, and sets the log level (--log-level flag takes precedence over config file). It then calls MergeGitignore to add .gitignore patterns to the ignore list. The initIndex function creates .memo/index directory with empty JSON files if they don't exist. Finally, it creates an Analyser and Watcher, calls watcher.ScanAll() to trigger initial analysis of all files. If --once flag is set, it calls Flush() directly and exits; otherwise it starts the watcher event loop in a goroutine and waits for SIGINT/SIGTERM to shut down gracefully."
     },
     {
       "title": "File Change Detection and Batching",
