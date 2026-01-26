@@ -69,26 +69,9 @@ Memo can be used as an MCP server with Kimi CLI. This enables two MCP tools:
 - `memo_list_keys`: List available keys at a path in `.memo/index` JSON files
 - `memo_get_value`: Get JSON value at a path in `.memo/index` files
 
-### Option 1: All-in-one (recommended)
+### Option 1: MCP server + manual watcher (recommended)
 
 Add to `~/.kimi/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "memo": {
-      "command": "memo",
-      "args": ["--mcp-with-watcher"]
-    }
-  }
-}
-```
-
-The `--mcp-with-watcher` flag runs both the MCP server and file watcher together, automatically keeping the index updated as you edit code.
-
-### Option 2: MCP server only
-
-If you want to see memo's real-time output (for debugging or monitoring), run the watcher manually in a separate terminal:
 
 ```json
 {
@@ -101,13 +84,28 @@ If you want to see memo's real-time output (for debugging or monitoring), run th
 }
 ```
 
-Then in another terminal:
+Then run the watcher manually in a separate terminal:
 
 ```bash
 memo --path /path/to/project
 ```
 
-This way you can monitor the watcher's analysis output while Kimi CLI uses the MCP tools.
+This way you can monitor the watcher's real-time analysis output while Kimi CLI uses the MCP tools.
+
+### Option 2: All-in-one (experimental)
+
+```json
+{
+  "mcpServers": {
+    "memo": {
+      "command": "memo",
+      "args": ["--mcp-with-watcher"]
+    }
+  }
+}
+```
+
+The `--mcp-with-watcher` flag runs both the MCP server and file watcher together. This is convenient but hides watcher output, making it harder to diagnose issues.
 
 ## Output
 
