@@ -18,12 +18,24 @@ Contains all modules in the codebase.
     {
       "name": "string - module/package name",
       "description": "string - what this module does",
-      "interfaces": "string - brief description of inputs/outputs and which modules it interacts with"
+      "interfaces": "string - brief description of inputs/outputs and which modules it interacts with",
+      "internal": {
+        "submodules": [
+          {
+            "name": "string - submodule name",
+            "description": "string - what this submodule does",
+            "interfaces": "string - submodule interfaces"
+          }
+        ],
+        "relationships": "string - how submodules relate within this module"
+      }
     }
   ],
   "relationships": "string - natural language description of how modules relate; optionally include mermaid diagram"
 }
 ```
+
+**Note:** `internal` is optional. Use it when a module has distinct submodules worth documenting.
 
 **Example:**
 ```json
@@ -37,10 +49,25 @@ Contains all modules in the codebase.
     {
       "name": "api",
       "description": "REST API layer that handles HTTP requests and routing",
-      "interfaces": "Receives HTTP requests, calls auth module for authentication, calls service modules for business logic"
+      "interfaces": "Receives HTTP requests, calls auth module for authentication, calls service modules for business logic",
+      "internal": {
+        "submodules": [
+          {
+            "name": "router",
+            "description": "URL routing and middleware chain",
+            "interfaces": "Receives requests, dispatches to handlers"
+          },
+          {
+            "name": "handlers",
+            "description": "Request handlers for each endpoint",
+            "interfaces": "Called by router, returns responses"
+          }
+        ],
+        "relationships": "router → handlers → response"
+      }
     }
   ],
-  "relationships": "## Module Dependencies\n\n```mermaid\ngraph LR\n  api --> auth\n  api --> service\n  auth --> database\n  auth --> cache\n  service --> database\n  service --> cache\n```\n\n## Notes\n\n- The **api** module is the main entry point for all HTTP requests\n- Auth failures short-circuit the request pipeline immediately\n- Cache is optional - system degrades gracefully to database-only mode if Redis is unavailable\n- Service modules are stateless and horizontally scalable"
+  "relationships": "api → auth → database/cache"
 }
 ```
 
