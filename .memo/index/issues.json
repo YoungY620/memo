@@ -25,7 +25,7 @@
         {
           "file": "analyser.go",
           "keyword": "maxRetries",
-          "line": 83
+          "line": 82
         },
         {
           "file": "analyser.go",
@@ -151,12 +151,24 @@
         {
           "file": "prompts/context.md",
           "keyword": "single source of truth",
-          "line": 209
+          "line": 236
         },
         {
           "file": "prompts/context.md",
           "keyword": "outdated-docs",
-          "line": 211
+          "line": 238
+        }
+      ]
+    },
+    {
+      "tags": ["bug"],
+      "title": "Unused 'root' field in Watcher struct",
+      "description": "The Watcher struct declares 'root' as part of 'root, debounceMs, maxWaitMs int' but this field is never used. The actual root path is stored in the separate 'rootPath string' field. This appears to be leftover from earlier code and should be cleaned up.",
+      "locations": [
+        {
+          "file": "watcher.go",
+          "keyword": "root, debounceMs",
+          "line": 14
         }
       ]
     }

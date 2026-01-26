@@ -28,5 +28,5 @@ kimi-cli/
 .sensitive/
 # Local development files
 .local/
-.memo
+# .memo
 testdata/
