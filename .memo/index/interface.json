@@ -25,6 +25,12 @@
       "description": "Runs in one-shot mode: performs initial scan, triggers analysis, then exits without entering watch mode. Useful for CI/CD pipelines, pre-commit hooks, or generating documentation without a background process."
     },
     {
+      "type": "cli",
+      "name": "--log-level",
+      "params": "string: error, notice, info, or debug",
+      "description": "Overrides the log level from config file. Takes precedence over config.yaml log_level setting."
+    },
+    {
       "type": "filesystem",
       "name": "config.yaml",
       "params": "YAML file with: log_level, agent.api_key, agent.model, watch.ignore_patterns, watch.debounce_ms, watch.max_wait_ms",

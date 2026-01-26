@@ -64,7 +64,7 @@
         {
           "file": "config.go",
           "keyword": "negation",
-          "line": 84
+          "line": 83
         }
       ]
     },
@@ -185,7 +185,7 @@
         {
           "file": "main.go",
           "keyword": "onceFlag",
-          "line": 85
+          "line": 91
         },
         {
           "file": "watcher.go",
@@ -196,6 +196,23 @@
           "file": "spec/feature-once-mode.md",
           "keyword": "Once mode",
           "line": 9
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Module-by-module thorough analysis workflow",
+      "description": "The analyse.md prompt enforces a thorough, module-by-module workflow to ensure no files are skipped during analysis. Instead of reading all files at once and updating index files in a single batch, the AI creates a fine-grained todo list with one item per changed file, groups them by module/directory, reads files one by one marking each as done, and updates index files after completing each module. This prevents context overflow on large changesets and ensures complete coverage.",
+      "locations": [
+        {
+          "file": "prompts/analyse.md",
+          "keyword": "Create Todo List",
+          "line": 5
+        },
+        {
+          "file": "spec/feature-thorough-analysis.md",
+          "keyword": "Thorough Analysis",
+          "line": 1
         }
       ]
     }
