@@ -2,8 +2,8 @@
   "modules": [
     {
       "name": "main",
-      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo/index directory with empty JSON files if not present, creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports three modes: watch mode (default) for continuous monitoring, once mode (--once) for one-shot analysis, and MCP mode (--mcp) for read-only index queries via stdio.",
-      "interfaces": "Receives CLI flags (--path, --config, --version, --once, --mcp, --log-level). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in MCP mode, calls mcp.Serve() and exits; in watch mode, starts watcher.Run() and waits for shutdown signal."
+      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo/index directory with empty JSON files if not present, creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports four modes: watch mode (default) for continuous monitoring, once mode (--once) for one-shot analysis, MCP mode (--mcp) for read-only index queries via stdio, and MCP-with-watcher mode (--mcp-with-watcher) that spawns a watcher subprocess and runs MCP server together.",
+      "interfaces": "Receives CLI flags (--path, --config, --version, --once, --mcp, --mcp-with-watcher, --log-level). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in MCP mode, calls mcp.Serve() and exits; in MCP-with-watcher mode, spawns watcher subprocess then calls mcp.Serve(); in watch mode, starts watcher.Run() and waits for shutdown signal."
     },
     {
       "name": "config",

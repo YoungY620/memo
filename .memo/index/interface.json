@@ -32,6 +32,12 @@
     },
     {
       "type": "cli",
+      "name": "--mcp-with-watcher",
+      "params": "none (boolean flag)",
+      "description": "Runs MCP server with a watcher subprocess. Spawns 'memo --path <workDir>' as a background subprocess to maintain the index, then runs the MCP server on stdio. On exit (SIGINT/SIGTERM), the subprocess is automatically killed. Combines both watcher and MCP functionality in a single command."
+    },
+    {
+      "type": "cli",
       "name": "--log-level",
       "params": "string: error, notice, info, or debug",
       "description": "Overrides the log level from config file. Takes precedence over config.yaml log_level setting."
