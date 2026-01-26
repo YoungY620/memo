@@ -178,5 +178,17 @@ func initIndex(indexDir string) error {
 		}
 	}
 
+	// Create local MCP config file for watcher sessions
+	// This prevents loading ~/.kimi/mcp.json (which may contain memo itself)
+	// Users can customize this file to add MCP servers for watcher sessions
+	memoDir := filepath.Dir(indexDir)
+	mcpFile := filepath.Join(memoDir, "mcp.json")
+	if _, err := os.Stat(mcpFile); os.IsNotExist(err) {
+		logDebug("Creating %s", mcpFile)
+		if err := os.WriteFile(mcpFile, []byte("{}"), 0644); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

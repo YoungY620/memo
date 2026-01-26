@@ -66,6 +66,53 @@ watch:
   max_wait_ms: 300000  # 5min max wait
 ```
 
+## Kimi CLI MCP Integration
+
+Memo can be used as an MCP server with Kimi CLI. This enables two MCP tools:
+
+- `memo_list_keys`: List available keys at a path in `.memo/index` JSON files
+- `memo_get_value`: Get JSON value at a path in `.memo/index` files
+
+### Option 1: All-in-one (recommended)
+
+Add to `~/.kimi/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "memo": {
+      "command": "memo",
+      "args": ["--mcp-with-watcher"]
+    }
+  }
+}
+```
+
+The `--mcp-with-watcher` flag runs both the MCP server and file watcher together, automatically keeping the index updated as you edit code.
+
+### Option 2: MCP server only
+
+If you want to see memo's real-time output (for debugging or monitoring), run the watcher manually in a separate terminal:
+
+```json
+{
+  "mcpServers": {
+    "memo": {
+      "command": "memo",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+
+Then in another terminal:
+
+```bash
+memo --path /path/to/project
+```
+
+This way you can monitor the watcher's analysis output while Kimi CLI uses the MCP tools.
+
 ## Output
 
 Memo maintains `.memo/` directory with:

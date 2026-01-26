@@ -2,7 +2,7 @@
   "modules": [
     {
       "name": "main",
-      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo/index directory with empty JSON files if not present, creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports four modes: watch mode (default) for continuous monitoring, once mode (--once) for one-shot analysis, MCP mode (--mcp) for read-only index queries via stdio, and MCP-with-watcher mode (--mcp-with-watcher) that spawns a watcher subprocess and runs MCP server together.",
+      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo directory (creates .memo/index/ with empty JSON files and .memo/mcp.json for isolated MCP config), creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports four modes: watch mode (default) for continuous monitoring, once mode (--once) for one-shot analysis, MCP mode (--mcp) for read-only index queries via stdio, and MCP-with-watcher mode (--mcp-with-watcher) that spawns a watcher subprocess and runs MCP server together.",
       "interfaces": "Receives CLI flags (--path, --config, --version, --once, --mcp, --mcp-with-watcher, --log-level). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in MCP mode, calls mcp.Serve() and exits; in MCP-with-watcher mode, spawns watcher subprocess then calls mcp.Serve(); in watch mode, starts watcher.Run() and waits for shutdown signal."
     },
     {
@@ -17,12 +17,12 @@
     },
     {
       "name": "analyser",
-      "description": "AI-powered analysis engine. Uses kimi-agent-sdk to create a session, sends prompts (context + analyse) to the AI agent, and runs a validation loop with feedback prompts if the generated JSON files fail schema validation. Uses LineBuffer for clean streaming output.",
+      "description": "AI-powered analysis engine. Uses kimi-agent-sdk to create a session with local MCP config (.memo/mcp.json) to prevent infinite recursion, sends prompts (context + analyse) to the AI agent, and runs a validation loop with feedback prompts if the generated JSON files fail schema validation. Uses LineBuffer for clean streaming output.",
       "interfaces": "NewAnalyser(cfg, workDir) creates analyser. Analyse(ctx, changedFiles) runs analysis with up to 5 retry attempts. Loads prompts from embedded prompts/*.md files. Calls ValidateIndex after each AI response. runPrompt(ctx, session, prompt) handles sending prompts and processing streamed responses with LineBuffer."
     },
     {
       "name": "validator",
-      "description": "JSON schema validator for .memo/index files. Defines schemas for arch.json, interface.json, stories.json, and issues.json. Validates each file against its schema and reports errors.",
+      "description": "JSON schema validator for .memo/index files. Defines schemas for arch.json, interface.json, stories.json, and issues.json. Validates each file against its schema and reports errors. The arch.json schema supports optional 'internal' field with submodules.",
       "interfaces": "ValidateIndex(indexDir) returns ValidationResult. FormatValidationErrors(result) formats errors as string. Called by analyser after each AI response."
     },
     {
@@ -51,5 +51,5 @@
       }
     }
   ],
-  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> config\n  main --> watcher\n  main --> analyser\n  main --> mcp\n  main --> log\n  config --> log\n  watcher --> log\n  analyser --> config\n  analyser --> validator\n  analyser --> log\n  analyser --> prompts[prompts/*.md]\n  analyser --> kimi-agent-sdk\n  validator --> gojsonschema\n  watcher --> fsnotify\n  mcp --> .memo/index\n```\n\n## Directory Organization\n\n- **prompts/** - Embedded prompt templates used by the analyser (context.md, analyse.md, feedback.md)\n- **spec/** - Design specification documents for features and architecture decisions\n- **mcp/** - MCP server package for read-only index queries\n\n## Notes\n\n- **main** is the orchestrator that wires everything together and selects mode (watch/once/mcp)\n- **watcher** operates independently, calling the onChange callback when files change\n- **analyser** is the core logic that invokes the AI agent and validates output\n- **validator** provides schema validation to ensure AI output is correct\n- **log** provides logging plus LineBuffer for streaming output handling\n- **mcp** provides read-only query interface to the index via MCP protocol\n- External dependencies: fsnotify (file watching), gojsonschema (validation), kimi-agent-sdk (AI agent)"
+  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> config\n  main --> watcher\n  main --> analyser\n  main --> mcp\n  main --> log\n  config --> log\n  watcher --> log\n  analyser --> config\n  analyser --> validator\n  analyser --> log\n  analyser --> prompts[prompts/*.md]\n  analyser --> kimi-agent-sdk\n  validator --> gojsonschema\n  watcher --> fsnotify\n  mcp --> .memo/index\n```\n\n## Directory Organization\n\n- **prompts/** - Embedded prompt templates used by the analyser (context.md, analyse.md, feedback.md)\n- **spec/** - Design specification documents for features and architecture decisions\n- **mcp/** - MCP server package for read-only index queries\n\n## Notes\n\n- **main** is the orchestrator that wires everything together and selects mode (watch/once/mcp/mcp-with-watcher)\n- **watcher** operates independently, calling the onChange callback when files change\n- **analyser** is the core logic that invokes the AI agent and validates output\n- **validator** provides schema validation to ensure AI output is correct\n- **log** provides logging plus LineBuffer for streaming output handling\n- **mcp** provides read-only query interface to the index via MCP protocol\n- External dependencies: fsnotify (file watching), gojsonschema (validation), kimi-agent-sdk (AI agent), gopkg.in/yaml.v3 (config parsing)"
 }
