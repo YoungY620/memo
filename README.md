@@ -28,6 +28,7 @@ memo                        # watch current directory
 memo --path /path/to/repo   # watch specific directory
 memo --config config.yaml   # custom config
 memo --once                 # analyze once and exit
+memo --log-level debug      # set log level (error/notice/info/debug)
 memo --version
 ```
 
