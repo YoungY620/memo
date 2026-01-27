@@ -67,6 +67,18 @@
       "description": "If present in watched directory, patterns are merged into ignore_patterns to avoid watching ignored files."
     },
     {
+      "type": "filesystem",
+      "name": ".memo/watcher.lock",
+      "params": "Lock file containing PID of running watcher",
+      "description": "Exclusive lock file using flock to ensure only one watcher process runs per directory. Contains PID for debugging. Lock is automatically released when process exits or crashes."
+    },
+    {
+      "type": "filesystem",
+      "name": ".memo/status.json",
+      "params": "JSON: {status: 'idle'|'analyzing', since?: ISO timestamp}",
+      "description": "Analysis status file read by MCP server. When status is 'analyzing', MCP responses include a warning that data may be stale. The 'since' field indicates when analysis started."
+    },
+    {
       "type": "rpc",
       "name": "memo_list_keys",
       "params": "path: string - JSON path like [arch][modules][0]",
@@ -157,6 +169,36 @@
       "name": "mcp.GetValue(indexDir, path string) (*GetValueResult, error)",
       "params": "indexDir: path to .memo/index, path: bracket-notation path",
       "description": "Returns JSON-marshaled value at the given path. Used by memo_get_value tool."
+    },
+    {
+      "type": "callback",
+      "name": "mcp.Server.getStatus() Status",
+      "params": "none",
+      "description": "Reads .memo/status.json to check analysis status. Returns Status with 'idle' or 'analyzing' and optional 'since' timestamp. Called by handleToolCall() to add warning to responses when analysis is in progress."
+    },
+    {
+      "type": "callback",
+      "name": "TryLock(memoDir string) (*os.File, error)",
+      "params": "memoDir: path to .memo directory",
+      "description": "Attempts to acquire exclusive flock on .memo/watcher.lock. Returns file handle if successful. Returns error 'another watcher is already running' if lock held by another process. Writes PID to lock file for debugging. Called by main at watcher/once mode startup."
+    },
+    {
+      "type": "callback",
+      "name": "Unlock(f *os.File)",
+      "params": "f: lock file handle from TryLock",
+      "description": "Releases the flock and closes the file. Safe to call with nil. Called via defer after TryLock succeeds."
+    },
+    {
+      "type": "callback",
+      "name": "SetStatus(memoDir string, status string) error",
+      "params": "memoDir: path to .memo directory, status: 'idle' or 'analyzing'",
+      "description": "Writes status to .memo/status.json. When status is 'analyzing', includes current timestamp in 'since' field. Called by analyser at start (analyzing) and end (idle) of Analyse()."
+    },
+    {
+      "type": "callback",
+      "name": "GetStatus(memoDir string) Status",
+      "params": "memoDir: path to .memo directory",
+      "description": "Reads status from .memo/status.json. Returns Status{Status: 'idle'} if file doesn't exist or is invalid JSON. Called by MCP server to check if analysis is in progress."
     }
   ]
 }
