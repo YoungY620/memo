@@ -268,12 +268,24 @@
         {
           "file": "mcp/server.go",
           "keyword": "schemaDesc",
-          "line": 103
+          "line": 128
         },
         {
           "file": "mcp/server.go",
           "keyword": "tools()",
-          "line": 109
+          "line": 154
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "MCP tool descriptions include whenToUse guidance for LLMs",
+      "description": "MCP tool descriptions embed a 'whenToUse' constant explaining when LLMs should use memo tools FIRST - specifically for understanding, summarizing, exploring, or navigating codebases. Lists typical requests (summarize repo, show architecture, find issues) and explains why memo is better than reading files directly (pre-indexed, structured, efficient, contextual). This guides LLMs to use the indexed documentation before attempting to scan the filesystem.",
+      "locations": [
+        {
+          "file": "mcp/server.go",
+          "keyword": "whenToUse",
+          "line": 134
         }
       ]
     },
