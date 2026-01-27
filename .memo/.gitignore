@@ -1,0 +1,3 @@
+# Runtime files - do not commit
+watcher.lock
+status.json
