@@ -110,6 +110,24 @@ func main() {
 	}
 	logDebug("Initialized .memo/index directory: %s", indexDir)
 
+	// Acquire single instance lock (watcher mode only)
+	memoDir := filepath.Join(workDir, ".memo")
+	lockFile, err := TryLock(memoDir)
+	if err != nil {
+		log.Fatalf("[ERROR] %v", err)
+	}
+	defer Unlock(lockFile)
+
+	// Ensure status is idle on startup and exit
+	if err := SetStatus(memoDir, "idle"); err != nil {
+		logError("Failed to set initial status: %v", err)
+	}
+	defer func() {
+		if err := SetStatus(memoDir, "idle"); err != nil {
+			logError("Failed to reset status on exit: %v", err)
+		}
+	}()
+
 	// Create analyser
 	analyser := NewAnalyser(cfg, workDir)
 

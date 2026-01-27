@@ -2,8 +2,8 @@
   "modules": [
     {
       "name": "main",
-      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo directory (creates .memo/index/ with empty JSON files and .memo/mcp.json for isolated MCP config), creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports four modes: watch mode (default) for continuous monitoring, once mode (--once) for one-shot analysis, MCP mode (--mcp) for read-only index queries via stdio, and MCP-with-watcher mode (--mcp-with-watcher) that spawns a watcher subprocess and runs MCP server together.",
-      "interfaces": "Receives CLI flags (--path, --config, --version, --once, --mcp, --mcp-with-watcher, --log-level). Calls config.LoadConfig, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in MCP mode, calls mcp.Serve() and exits; in MCP-with-watcher mode, spawns watcher subprocess then calls mcp.Serve(); in watch mode, starts watcher.Run() and waits for shutdown signal."
+      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo directory (creates .memo/index/ with empty JSON files and .memo/mcp.json for isolated MCP config), acquires single-instance lock via TryLock(), initializes status to 'idle', creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports four modes: watch mode (default) for continuous monitoring, once mode (--once) for one-shot analysis, MCP mode (--mcp) for read-only index queries via stdio, and MCP-with-watcher mode (--mcp-with-watcher) that spawns a watcher subprocess and runs MCP server together.",
+      "interfaces": "Receives CLI flags (--path, --config, --version, --once, --mcp, --mcp-with-watcher, --log-level). Calls config.LoadConfig, TryLock(memoDir) to acquire single-instance lock, SetStatus('idle') to initialize status, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in MCP mode, calls mcp.Serve() and exits; in MCP-with-watcher mode, spawns watcher subprocess then calls mcp.Serve(); in watch mode, starts watcher.Run() and waits for shutdown signal. On exit, releases lock via defer Unlock() and resets status to 'idle'."
     },
     {
       "name": "config",
@@ -17,8 +17,8 @@
     },
     {
       "name": "analyser",
-      "description": "AI-powered analysis engine. Uses kimi-agent-sdk to create a session with local MCP config (.memo/mcp.json) to prevent infinite recursion. Generates a deterministic session ID (memo-<8-char-hash>) based on working directory path for session reuse. Sends prompts (context + analyse) to the AI agent, and runs a validation loop with feedback prompts if the generated JSON files fail schema validation. Uses LineBuffer for clean streaming output.",
-      "interfaces": "NewAnalyser(cfg, workDir) creates analyser with deterministic session ID. generateSessionID(workDir) creates 'memo-<hash>' format ID. Analyse(ctx, changedFiles) runs analysis with up to 5 retry attempts. Loads prompts from embedded prompts/*.md files. Calls ValidateIndex after each AI response. runPrompt(ctx, session, prompt) handles sending prompts and processing streamed responses with LineBuffer."
+      "description": "AI-powered analysis engine. Uses kimi-agent-sdk to create a session with local MCP config (.memo/mcp.json) to prevent infinite recursion. Generates a deterministic session ID (memo-<8-char-hash>) based on working directory path for session reuse. Sends prompts (context + analyse) to the AI agent, and runs a validation loop with feedback prompts if the generated JSON files fail schema validation. Uses LineBuffer for clean streaming output. Sets analysis status via status module before/after analysis to signal MCP clients.",
+      "interfaces": "NewAnalyser(cfg, workDir) creates analyser with deterministic session ID. generateSessionID(workDir) creates 'memo-<hash>' format ID. Analyse(ctx, changedFiles) runs analysis with up to 5 retry attempts - calls SetStatus('analyzing') at start and SetStatus('idle') at end via defer. Loads prompts from embedded prompts/*.md files. Calls ValidateIndex after each AI response. runPrompt(ctx, session, prompt) handles sending prompts and processing streamed responses with LineBuffer."
     },
     {
       "name": "validator",
@@ -31,15 +31,25 @@
       "interfaces": "SetLogLevel(level) sets global log level. logError/logNotice/logInfo/logDebug functions for logging. NewLineBuffer(timeout) creates a buffer, Write(s) appends text, Flush(force) returns content to output."
     },
     {
+      "name": "lock",
+      "description": "Watcher single instance lock using flock. Prevents multiple watcher processes from running on the same directory, which would cause race conditions and data corruption when writing to .memo/index/*.json files.",
+      "interfaces": "TryLock(memoDir) attempts to acquire exclusive lock on .memo/watcher.lock using syscall.Flock with LOCK_EX|LOCK_NB (non-blocking). Returns file handle if successful, error if another watcher is running. Writes PID to lock file for debugging. Unlock(f) releases the lock. Called by main at startup for watcher/once modes."
+    },
+    {
+      "name": "status",
+      "description": "Analysis status management via .memo/status.json. Signals to MCP clients whether analysis is in progress, allowing them to warn users about potentially stale data.",
+      "interfaces": "SetStatus(memoDir, status) writes status ('idle' or 'analyzing') to .memo/status.json. When 'analyzing', includes timestamp. GetStatus(memoDir) reads status, returns 'idle' if file missing or invalid. Called by analyser before/after Analyse()."
+    },
+    {
       "name": "mcp",
-      "description": "MCP (Model Context Protocol) server that exposes .memo/index/*.json via safe JSON path query. Provides read-only access to the documentation index via stdio-based JSON-RPC 2.0 protocol. Only starts when --mcp flag is set, and requires existing index (created by watcher mode).",
-      "interfaces": "Serve(workDir) starts the MCP server and blocks. Exposes two tools: memo_list_keys (returns keys for dict or length for list) and memo_get_value (returns JSON value at path). Used by main when --mcp flag is set.",
+      "description": "MCP (Model Context Protocol) server that exposes .memo/index/*.json via safe JSON path query. Provides read-only access to the documentation index via stdio-based JSON-RPC 2.0 protocol. Checks .memo/status.json before each tool call and adds a 'warning' field to responses when analysis is in progress, alerting clients that data may be stale.",
+      "interfaces": "Serve(workDir) starts the MCP server and blocks. Exposes two tools: memo_list_keys and memo_get_value. Server.getStatus() reads .memo/status.json and handleToolCall() adds Warning to ToolCallResult when status is 'analyzing'. Used by main when --mcp flag is set.",
       "internal": {
         "submodules": [
           {
             "name": "server",
-            "description": "MCP stdio server handling JSON-RPC 2.0 protocol. Implements initialize, notifications/initialized, tools/list, and tools/call methods. Returns server capabilities and tool definitions.",
-            "interfaces": "NewServer(workDir) creates server with indexDir path. Run() starts event loop reading newline-delimited JSON from stdin. tools() returns Tool definitions with schemas."
+            "description": "MCP stdio server handling JSON-RPC 2.0 protocol. Implements initialize, notifications/initialized, tools/list, and tools/call methods. Returns server capabilities and tool definitions. Checks analysis status and adds warning to tool responses when analysis is in progress.",
+            "interfaces": "NewServer(workDir) creates server with indexDir and memoDir paths. Run() starts event loop reading newline-delimited JSON from stdin. tools() returns Tool definitions with schemas. getStatus() reads .memo/status.json. handleToolCall() checks status and adds Warning field to ToolCallResult if status is 'analyzing'."
           },
           {
             "name": "query",
@@ -51,5 +61,5 @@
       }
     }
   ],
-  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> config\n  main --> watcher\n  main --> analyser\n  main --> mcp\n  main --> log\n  config --> log\n  watcher --> log\n  analyser --> config\n  analyser --> validator\n  analyser --> log\n  analyser --> prompts[prompts/*.md]\n  analyser --> kimi-agent-sdk\n  validator --> gojsonschema\n  watcher --> fsnotify\n  mcp --> .memo/index\n```\n\n## Directory Organization\n\n- **prompts/** - Embedded prompt templates used by the analyser (context.md, analyse.md, feedback.md)\n- **spec/** - Design specification documents for features and architecture decisions\n- **mcp/** - MCP server package for read-only index queries\n\n## Notes\n\n- **main** is the orchestrator that wires everything together and selects mode (watch/once/mcp/mcp-with-watcher)\n- **watcher** operates independently, calling the onChange callback when files change\n- **analyser** is the core logic that invokes the AI agent and validates output\n- **validator** provides schema validation to ensure AI output is correct\n- **log** provides logging plus LineBuffer for streaming output handling\n- **mcp** provides read-only query interface to the index via MCP protocol\n- External dependencies: fsnotify (file watching), gojsonschema (validation), kimi-agent-sdk (AI agent), gopkg.in/yaml.v3 (config parsing)"
+  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> config\n  main --> watcher\n  main --> analyser\n  main --> mcp\n  main --> log\n  main --> lock\n  main --> status\n  config --> log\n  watcher --> log\n  analyser --> config\n  analyser --> validator\n  analyser --> log\n  analyser --> status\n  analyser --> prompts[prompts/*.md]\n  analyser --> kimi-agent-sdk\n  validator --> gojsonschema\n  watcher --> fsnotify\n  mcp --> .memo/index\n  mcp --> status\n```\n\n## Directory Organization\n\n- **prompts/** - Embedded prompt templates used by the analyser (context.md, analyse.md, feedback.md)\n- **spec/** - Design specification documents for features and architecture decisions\n- **mcp/** - MCP server package for read-only index queries\n\n## Notes\n\n- **main** is the orchestrator that wires everything together and selects mode (watch/once/mcp/mcp-with-watcher)\n- **watcher** operates independently, calling the onChange callback when files change\n- **analyser** is the core logic that invokes the AI agent and validates output\n- **validator** provides schema validation to ensure AI output is correct\n- **log** provides logging plus LineBuffer for streaming output handling\n- **mcp** provides read-only query interface to the index via MCP protocol\n- **lock** ensures only one watcher runs per directory using flock\n- **status** signals analysis state to MCP clients via .memo/status.json\n- External dependencies: fsnotify (file watching), gojsonschema (validation), kimi-agent-sdk (AI agent), gopkg.in/yaml.v3 (config parsing)"
 }

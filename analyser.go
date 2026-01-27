@@ -60,6 +60,17 @@ func NewAnalyser(cfg *Config, workDir string) *Analyser {
 func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	logInfo("Starting analysis for %d files", len(changedFiles))
 
+	// Mark analysis in progress
+	memoDir := filepath.Dir(a.indexDir)
+	if err := SetStatus(memoDir, "analyzing"); err != nil {
+		logError("Failed to set status: %v", err)
+	}
+	defer func() {
+		if err := SetStatus(memoDir, "idle"); err != nil {
+			logError("Failed to clear status: %v", err)
+		}
+	}()
+
 	var session *agent.Session
 	var err error
 

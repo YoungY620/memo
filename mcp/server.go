@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // JSON-RPC 2.0 structures
@@ -76,6 +77,13 @@ type ToolCallParams struct {
 type ToolCallResult struct {
 	Content []ContentItem `json:"content"`
 	IsError bool          `json:"isError,omitempty"`
+	Warning string        `json:"warning,omitempty"`
+}
+
+// Status represents the analysis status from status.json
+type Status struct {
+	Status string     `json:"status"`
+	Since  *time.Time `json:"since,omitempty"`
 }
 
 type ContentItem struct {
@@ -86,17 +94,34 @@ type ContentItem struct {
 // Server is the MCP server
 type Server struct {
 	indexDir string
+	memoDir  string
 	reader   *bufio.Reader
 	writer   io.Writer
 }
 
 // NewServer creates a new MCP server
 func NewServer(workDir string) *Server {
+	memoDir := filepath.Join(workDir, ".memo")
 	return &Server{
-		indexDir: filepath.Join(workDir, ".memo", "index"),
+		indexDir: filepath.Join(memoDir, "index"),
+		memoDir:  memoDir,
 		reader:   bufio.NewReader(os.Stdin),
 		writer:   os.Stdout,
 	}
+}
+
+// getStatus reads the analysis status from status.json
+func (s *Server) getStatus() Status {
+	path := filepath.Join(s.memoDir, "status.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Status{Status: "idle"}
+	}
+	var status Status
+	if err := json.Unmarshal(data, &status); err != nil {
+		return Status{Status: "idle"}
+	}
+	return status
 }
 
 // tool descriptions with schema
@@ -229,12 +254,23 @@ func (s *Server) handleToolCall(id any, params *ToolCallParams) *Response {
 		}
 	}
 
+	// Check analysis status
+	var warning string
+	status := s.getStatus()
+	if status.Status == "analyzing" {
+		warning = "Data may be stale: analysis in progress"
+		if status.Since != nil {
+			warning += fmt.Sprintf(" (started %s ago)", time.Since(*status.Since).Round(time.Second))
+		}
+	}
+
 	resultJSON, _ := json.Marshal(result)
 	return &Response{
 		JSONRPC: "2.0",
 		ID:      id,
 		Result: ToolCallResult{
 			Content: []ContentItem{{Type: "text", Text: string(resultJSON)}},
+			Warning: warning,
 		},
 	}
 }
