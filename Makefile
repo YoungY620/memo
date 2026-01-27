@@ -22,5 +22,7 @@ clean:
 
 install: build
 	mkdir -p $(HOME)/.local/bin
+	@# Remove old binary first to avoid dyld issues when processes hold references
+	rm -f $(HOME)/.local/bin/$(BINARY)
 	cp $(BINARY) $(HOME)/.local/bin/$(BINARY)
 	@echo "Installed $(BINARY) to $(HOME)/.local/bin"

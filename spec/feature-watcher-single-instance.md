@@ -327,8 +327,42 @@ func GetStatus(memoDir string) Status {
 |----------|--------|
 | First watcher starts | Acquires lock, runs normally |
 | Second watcher starts (same path) | Fails: "another watcher is already running" |
-| Watcher exits/crashes | OS releases lock automatically |
+| Watcher exits normally (SIGINT/SIGTERM) | Graceful shutdown releases lock |
+| Watcher crashes | OS releases flock automatically |
 | `--mcp` mode | No lock needed (read-only) |
+
+### Startup Reset
+
+On startup, watcher resets all locks and status unconditionally:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Watcher starts                                                 │
+│       │                                                         │
+│       ▼                                                         │
+│  1. TryLock() - flock is auto-released by OS on crash           │
+│       │         so new process can always acquire               │
+│       ▼                                                         │
+│  2. SetStatus("idle") - unconditionally reset status            │
+│       │                 ignore previous "analyzing" state       │
+│       ▼                                                         │
+│  Ready to watch                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Design decision**: No need to wait for previous analysis or check stale state. On restart, assume all previous state is invalid and reset everything.
+
+```go
+// main.go - startup
+lockFile, err := TryLock(memoDir)  // OS auto-releases on crash
+if err != nil {
+    log.Fatalf("[ERROR] %v", err)
+}
+defer Unlock(lockFile)
+
+SetStatus(memoDir, "idle")  // Unconditionally reset
+defer SetStatus(memoDir, "idle")
+```
 
 ### Analysis Status
 
@@ -364,3 +398,5 @@ func GetStatus(memoDir string) Status {
 - [x] Test: MCP returns warning during analysis
 - [x] Test: status resets to idle after analysis completes
 - [x] Test: status resets to idle after watcher crash
+- [x] Test: restart after crash resets status to idle
+- [x] Test: flock auto-released by OS, new process can acquire
