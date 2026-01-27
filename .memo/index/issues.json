@@ -25,12 +25,12 @@
         {
           "file": "analyser.go",
           "keyword": "maxRetries",
-          "line": 109
+          "line": 120
         },
         {
           "file": "analyser.go",
           "keyword": "feedbackPrompt",
-          "line": 121
+          "line": 132
         }
       ]
     },
@@ -42,7 +42,7 @@
         {
           "file": "analyser.go",
           "keyword": "kimi defaults",
-          "line": 82
+          "line": 81
         },
         {
           "file": "config.yaml",
@@ -64,7 +64,7 @@
         {
           "file": "config.go",
           "keyword": "negation",
-          "line": 84
+          "line": 83
         }
       ]
     },
@@ -88,7 +88,7 @@
         {
           "file": "analyser.go",
           "keyword": "WithAutoApprove",
-          "line": 77
+          "line": 88
         }
       ]
     },
@@ -100,7 +100,7 @@
         {
           "file": "analyser.go",
           "keyword": "NewLineBuffer",
-          "line": 140
+          "line": 151
         },
         {
           "file": "log.go",
@@ -185,7 +185,7 @@
         {
           "file": "main.go",
           "keyword": "onceFlag",
-          "line": 136
+          "line": 154
         },
         {
           "file": "watcher.go",
@@ -353,7 +353,7 @@
         {
           "file": "analyser.go",
           "keyword": "500 * time.Millisecond",
-          "line": 140
+          "line": 151
         }
       ]
     },
@@ -409,12 +409,12 @@
         {
           "file": "analyser.go",
           "keyword": "WithMCPConfigFile",
-          "line": 78
+          "line": 89
         },
         {
           "file": "main.go",
           "keyword": "mcp.json",
-          "line": 185
+          "line": 203
         }
       ]
     },
@@ -507,6 +507,28 @@
         {
           "file": "spec/fix-session-id-pollution.md",
           "keyword": "Session ID Pollution",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Delete before copy to prevent dyld zombie processes on macOS",
+      "description": "Fixed a macOS-specific issue where reinstalling memo binary while zombie processes hold references to the old file caused new processes to hang in dyld (Uninterruptible Sleep state). The fix ensures `rm -f` is called before copying/moving the new binary, creating a new inode that has no conflict with zombie process references. Implemented in both Makefile and install.sh. Note: Existing UE zombie processes can only be cleared by system reboot.",
+      "locations": [
+        {
+          "file": "Makefile",
+          "keyword": "rm -f",
+          "line": 26
+        },
+        {
+          "file": "install.sh",
+          "keyword": "rm -f",
+          "line": 48
+        },
+        {
+          "file": "spec/fix-dyld-zombie-process.md",
+          "keyword": "dyld Zombie Process",
           "line": 1
         }
       ]
