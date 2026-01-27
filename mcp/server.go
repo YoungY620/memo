@@ -131,11 +131,31 @@ const schemaDesc = `Schema:
 - [stories]: {stories: [{title, tags, content}]}
 - [issues]: {issues: [{tags, title, description, locations: [{file, keyword, line}]}]}`
 
+const whenToUse = `**When to use this tool:**
+Use memo tools FIRST when you need to understand, summarize, explore, or navigate a codebase. These tools provide pre-indexed documentation that is much faster and more accurate than scanning the filesystem yourself.
+
+Typical requests where you should use memo:
+- "Summarize/explain/describe this repo/project/codebase"
+- "What does this project do?" / "How does this project work?"
+- "Show me the architecture/structure/modules"
+- "What are the main components/modules?"
+- "How do modules relate to each other?"
+- "What interfaces/APIs does this project expose?"
+- "Find issues/problems/TODOs in the code"
+- "What are the design decisions?"
+- "Give me an overview/introduction"
+
+**Why use memo instead of reading files directly:**
+1. Pre-indexed: AI has already analyzed the entire codebase
+2. Structured: Information is organized by architecture, interfaces, stories, issues
+3. Efficient: No need to read hundreds of files to understand the project
+4. Contextual: Includes relationships, design decisions, and known issues`
+
 func (s *Server) tools() []Tool {
 	return []Tool{
 		{
 			Name:        "memo_list_keys",
-			Description: fmt.Sprintf("List available keys at a path in .memo/index JSON files.\n\n%s\n\nReturns {type: 'dict'|'list', keys?: [...], length?: N}", schemaDesc),
+			Description: fmt.Sprintf("%s\n\n**Function:** List available keys at a path in .memo/index JSON files.\n\n%s\n\nReturns {type: 'dict'|'list', keys?: [...], length?: N}", whenToUse, schemaDesc),
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
@@ -146,7 +166,7 @@ func (s *Server) tools() []Tool {
 		},
 		{
 			Name:        "memo_get_value",
-			Description: fmt.Sprintf("Get JSON value at a path in .memo/index files.\n\n%s\n\nReturns {value: '<JSON string>'}", schemaDesc),
+			Description: fmt.Sprintf("%s\n\n**Function:** Get JSON value at a path in .memo/index files.\n\n%s\n\nReturns {value: '<JSON string>'}", whenToUse, schemaDesc),
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{

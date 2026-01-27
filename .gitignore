@@ -30,3 +30,4 @@ kimi-cli/
 .local/
 # .memo
 testdata/
+.memo/watcher.lock

@@ -21,5 +21,6 @@ clean:
 	rm -rf dist $(BINARY)
 
 install: build
-	sudo cp $(BINARY) /usr/local/bin/$(BINARY)
-	@echo "Installed $(BINARY) to /usr/local/bin"
+	mkdir -p $(HOME)/.local/bin
+	cp $(BINARY) $(HOME)/.local/bin/$(BINARY)
+	@echo "Installed $(BINARY) to $(HOME)/.local/bin"

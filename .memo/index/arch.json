@@ -42,13 +42,13 @@
     },
     {
       "name": "mcp",
-      "description": "MCP (Model Context Protocol) server that exposes .memo/index/*.json via safe JSON path query. Provides read-only access to the documentation index via stdio-based JSON-RPC 2.0 protocol. Checks .memo/status.json before each tool call and adds a 'warning' field to responses when analysis is in progress, alerting clients that data may be stale.",
+      "description": "MCP (Model Context Protocol) server that exposes .memo/index/*.json via safe JSON path query. Provides read-only access to the documentation index via stdio-based JSON-RPC 2.0 protocol. Tool descriptions include embedded LLM guidance (whenToUse) explaining when to use memo tools first for codebase understanding. Checks .memo/status.json before each tool call and adds a 'warning' field to responses when analysis is in progress, alerting clients that data may be stale.",
       "interfaces": "Serve(workDir) starts the MCP server and blocks. Exposes two tools: memo_list_keys and memo_get_value. Server.getStatus() reads .memo/status.json and handleToolCall() adds Warning to ToolCallResult when status is 'analyzing'. Used by main when --mcp flag is set.",
       "internal": {
         "submodules": [
           {
             "name": "server",
-            "description": "MCP stdio server handling JSON-RPC 2.0 protocol. Implements initialize, notifications/initialized, tools/list, and tools/call methods. Returns server capabilities and tool definitions. Checks analysis status and adds warning to tool responses when analysis is in progress.",
+            "description": "MCP stdio server handling JSON-RPC 2.0 protocol. Implements initialize, notifications/initialized, tools/list, and tools/call methods. Returns server capabilities and tool definitions with embedded LLM guidance (schemaDesc + whenToUse). Checks analysis status and adds warning to tool responses when analysis is in progress.",
             "interfaces": "NewServer(workDir) creates server with indexDir and memoDir paths. Run() starts event loop reading newline-delimited JSON from stdin. tools() returns Tool definitions with schemas. getStatus() reads .memo/status.json. handleToolCall() checks status and adds Warning field to ToolCallResult if status is 'analyzing'."
           },
           {
