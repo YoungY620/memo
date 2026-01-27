@@ -98,6 +98,3 @@ Kimi will use memo tools to read `.memo/index` and provide a summary.
 └── .gitignore          # excludes runtime files
 ```
 
-## License
-
-MIT
