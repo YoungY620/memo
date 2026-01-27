@@ -17,9 +17,9 @@ Vibe coding with AI agents across multiple sessions evolves fast—too fast for 
 Inspired by traditional code indexing, Memo maintains a semantic index specifically for coding agents, capturing architecture and key decisions. This enables:
 
 - **"Summarize this repo"** — No need to read every file. Memo provides instant context.
-- **Preserve design decisions** — Trade-offs and constraints are recorded once, not repeated every session.
+- **Preserve design decisions** — Trade-offs and constraints are recorded once, no need to repeat every session.
 - **Holistic refactoring** — After modifying a module, agents can update related code across the project, even connections that static analysis can't detect.
-- **Large document navigation** — Find related content without scanning everything.
+- **Beyond coding: Large document navigation** — Find related content without scanning everything.
 
 ## Usage
 
@@ -29,6 +29,7 @@ memo --path /path/to/repo   # watch specific directory
 memo --config config.yaml   # custom config
 memo --once                 # analyze once and exit
 memo --log-level debug      # set log level (error/notice/info/debug)
+memo --mcp                  # start a mcp server (stdio)
 memo --version
 ```
 
