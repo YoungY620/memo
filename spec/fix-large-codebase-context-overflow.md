@@ -1,78 +1,46 @@
 # Fix: Large Codebase Context Overflow
 
+Prevent context window overflow when analyzing large codebases by using relative paths and batched file processing.
+
+## Status
+
+- [ ] Not implemented
+- [ ] Pending
+
 ## Problem
 
-When the codebase is very large (e.g., includes dependencies like `node_modules`, `vendor`, or complex monorepos), the file path list alone can exceed the LLM context window limit.
+| Issue | Impact |
+|-------|--------|
+| Absolute paths consume tokens | `......` repeated N times |
+| All files sent in one batch | 15,000 files × 80 chars = 1.2MB (exceeds 128K context) |
+| No overflow detection | Analysis fails silently or produces incomplete results |
 
-**Current behavior:**
-- All changed file paths are passed to the analyze prompt in one batch
-- Each file path is an absolute path like `/path/to/dev/working/very-long-project-name/src/components/deeply/nested/path/to/file.tsx`
-- For large codebases with thousands of files, this list can consume most of the context window
-
-**Example scenario:**
+**Example:**
 ```
-Initial scan: 15,000 files
-Average path length: 80 characters
-Total path data: ~1.2MB (just paths, no content)
-Context window: 128K tokens (~500KB text)
-Result: Context overflow before any analysis begins
+Files: 15,000
+Avg path: 80 characters  
+Total: ~1.2MB text (just paths)
+Context: 128K tokens (~500KB)
+Result: Overflow before analysis begins
 ```
 
 ## Solution
 
-### 1. Use Relative Paths
+| Component | Description |
+|-----------|-------------|
+| Relative paths | Provide workDir once, use relative paths for files |
+| Token estimation | `len(text) / 4` ≈ tokens |
+| Batching | Split files when exceeding threshold |
+| Sequential processing | Process batch → update index → next batch |
 
-Refactor the analyze prompt template to:
-- Provide the project working directory as an absolute path once
-- Use relative paths for all file references
+## Modules
 
-**Before:**
-```
-Changed files:
-- /path/to/dev/working/my-project/src/components/Button.tsx
-- /path/to/dev/working/my-project/src/components/Input.tsx
-- /path/to/dev/working/my-project/src/utils/helpers.ts
-```
+| Module | Responsibility |
+|--------|----------------|
+| `analyser.go` | Batch splitting, relative path conversion |
+| `prompts/analyse.md` | Template with workDir and batch info |
 
-**After:**
-```
-Working directory: /path/to/dev/working/my-project
-
-Changed files:
-- src/components/Button.tsx
-- src/components/Input.tsx
-- src/utils/helpers.ts
-```
-
-### 2. Context Window Check
-
-Before sending the analyze request, estimate token usage:
-
-```go
-// Rough estimation: 1 token ≈ 4 characters for code/paths
-func estimateTokens(text string) int {
-    return len(text) / 4
-}
-
-// Check if file list exceeds threshold
-const contextLimit = 128000      // tokens
-const reservedForPrompt = 20000  // tokens for system prompt, schema, etc.
-const reservedForResponse = 30000 // tokens for model response
-const availableForFiles = contextLimit - reservedForPrompt - reservedForResponse
-
-func needsBatching(files []string, workDir string) bool {
-    totalLen := 0
-    for _, f := range files {
-        relPath, _ := filepath.Rel(workDir, f)
-        totalLen += len(relPath) + 3 // "+ 3" for "- " prefix and newline
-    }
-    return estimateTokens(totalLen) > availableForFiles
-}
-```
-
-### 3. Batched Analysis Flow
-
-When file count exceeds threshold, split into batches:
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -80,174 +48,157 @@ When file count exceeds threshold, split into batches:
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
-                   ┌─────────────────┐
-                   │ Exceeds limit?  │
-                   └─────────────────┘
-                     │           │
-                    Yes          No
-                     │           │
-                     ▼           ▼
-          ┌──────────────┐   ┌──────────────┐
-          │ Split into   │   │ Single batch │
-          │ batches      │   │ analysis     │
-          └──────────────┘   └──────────────┘
-                │
-                ▼
-    ┌───────────────────────────────────┐
-    │  Batch 1    Batch 2    Batch N    │
-    │  (files     (files     (files     │
-    │   1-500)    501-1000)  ...)       │
-    └───────────────────────────────────┘
-                │
-                ▼
-    ┌───────────────────────────────────┐
-    │  Analyze each batch sequentially  │
-    │  - Read current index state       │
-    │  - Process batch files            │
-    │  - Update index incrementally     │
-    └───────────────────────────────────┘
+                 ┌─────────────────────┐
+                 │ Convert to relative │
+                 │ paths               │
+                 └─────────────────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ estimateTokens() >  │
+                 │ threshold?          │
+                 └─────────────────────┘
+                   │               │
+                  Yes              No
+                   │               │
+                   ▼               ▼
+        ┌──────────────────┐  ┌──────────────────┐
+        │ splitIntoBatches │  │ Single batch     │
+        └──────────────────┘  └──────────────────┘
+                   │
+                   ▼
+        ┌──────────────────┐
+        │ For each batch:  │
+        │ 1. Build prompt  │
+        │ 2. Send to LLM   │
+        │ 3. Update index  │
+        └──────────────────┘
 ```
 
-### 4. Batch Processing Strategy
+## Files
 
-**Option A: Sequential batches with incremental updates**
-- Process batch 1 → update index
-- Process batch 2 → update index (reading previous state)
-- ...continue until all batches processed
+| File | Change |
+|------|--------|
+| `analyser.go` | Add `splitIntoBatches()`, `estimateTokens()`, update `Analyse()` |
+| `prompts/analyse.md` | Add `{{.WorkDir}}`, batch number, relative paths |
 
-**Option B: Parallel batches with merge**
-- Process all batches in parallel
-- Merge index updates at the end
-- Risk: Conflicts in overlapping module definitions
+## Patch
 
-**Recommendation:** Option A (sequential) for simplicity and consistency.
+```diff
+// analyser.go
 
-### 5. Implementation Changes
++ const (
++     maxFilesPerBatch = 500
++     maxCharsPerBatch = 50000  // ~12.5K tokens
++     contextReserve   = 50000  // tokens for prompt + response
++ )
 
-#### 5.1 Update `prompts/analyse.md`
++ type AnalysisBatch struct {
++     Files        []string
++     BatchNum     int
++     TotalBatches int
++     WorkDir      string
++ }
 
-Add working directory context:
++ func estimateTokens(text string) int {
++     return len(text) / 4
++ }
 
-```markdown
-# Analysis Task
++ func (a *Analyser) toRelativePaths(files []string) []string {
++     rel := make([]string, 0, len(files))
++     for _, f := range files {
++         r, err := filepath.Rel(a.workDir, f)
++         if err != nil {
++             r = f
++         }
++         rel = append(rel, r)
++     }
++     return rel
++ }
 
-**Working Directory:** {{.WorkDir}}
++ func (a *Analyser) splitIntoBatches(files []string) [][]string {
++     var batches [][]string
++     var batch []string
++     var chars int
++     
++     for _, f := range files {
++         if len(batch) >= maxFilesPerBatch || chars+len(f) > maxCharsPerBatch {
++             if len(batch) > 0 {
++                 batches = append(batches, batch)
++             }
++             batch = nil
++             chars = 0
++         }
++         batch = append(batch, f)
++         chars += len(f) + 3
++     }
++     if len(batch) > 0 {
++         batches = append(batches, batch)
++     }
++     return batches
++ }
 
-Files in the codebase have changed. All paths below are relative to the working directory.
-
-## Changed Files (Batch {{.BatchNum}}/{{.TotalBatches}})
-
-{{range .Files}}
-- {{.}}
-{{end}}
-
-{{if gt .TotalBatches 1}}
-**Note:** This is batch {{.BatchNum}} of {{.TotalBatches}}. Focus only on files in this batch. Previous batches have already been processed.
-{{end}}
+  func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
++     // Convert to relative paths
++     relFiles := a.toRelativePaths(changedFiles)
++     
++     // Split into batches if needed
++     batches := a.splitIntoBatches(relFiles)
++     
++     for i, batch := range batches {
++         if err := a.analyseBatch(ctx, AnalysisBatch{
++             Files:        batch,
++             BatchNum:     i + 1,
++             TotalBatches: len(batches),
++             WorkDir:      a.workDir,
++         }); err != nil {
++             return fmt.Errorf("batch %d/%d: %w", i+1, len(batches), err)
++         }
++     }
++     return nil
+  }
 ```
 
-#### 5.2 Update `analyser.go`
+```diff
+// prompts/analyse.md
 
-```go
-type AnalysisBatch struct {
-    Files       []string
-    BatchNum    int
-    TotalBatches int
-    WorkDir     string
-}
+  # Analysis Task
 
-func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
-    // Convert to relative paths
-    relFiles := make([]string, 0, len(changedFiles))
-    for _, f := range changedFiles {
-        rel, err := filepath.Rel(a.workDir, f)
-        if err != nil {
-            rel = f // fallback to absolute
-        }
-        relFiles = append(relFiles, rel)
-    }
-    
-    // Check if batching needed
-    batches := a.splitIntoBatches(relFiles)
-    
-    for i, batch := range batches {
-        err := a.analyseBatch(ctx, AnalysisBatch{
-            Files:        batch,
-            BatchNum:     i + 1,
-            TotalBatches: len(batches),
-            WorkDir:      a.workDir,
-        })
-        if err != nil {
-            return fmt.Errorf("batch %d/%d failed: %w", i+1, len(batches), err)
-        }
-    }
-    return nil
-}
++ **Working Directory:** {{.WorkDir}}
++ 
+  Files in the codebase have changed.
++ All paths below are relative to the working directory.
 
-func (a *Analyser) splitIntoBatches(files []string) [][]string {
-    const maxFilesPerBatch = 500  // Conservative limit
-    const maxCharsPerBatch = 50000 // ~12.5K tokens
-    
-    var batches [][]string
-    var currentBatch []string
-    var currentChars int
-    
-    for _, f := range files {
-        if len(currentBatch) >= maxFilesPerBatch || 
-           currentChars+len(f) > maxCharsPerBatch {
-            if len(currentBatch) > 0 {
-                batches = append(batches, currentBatch)
-            }
-            currentBatch = nil
-            currentChars = 0
-        }
-        currentBatch = append(currentBatch, f)
-        currentChars += len(f) + 3
-    }
-    
-    if len(currentBatch) > 0 {
-        batches = append(batches, currentBatch)
-    }
-    
-    return batches
-}
-```
++ ## Changed Files (Batch {{.BatchNum}}/{{.TotalBatches}})
 
-#### 5.3 Update prompt loading
+- Changed files:
+  {{range .Files}}
+  - {{.}}
+  {{end}}
 
-```go
-func (a *Analyser) buildAnalysePrompt(batch AnalysisBatch) string {
-    tmpl := loadPrompt("analyse")
-    
-    var buf bytes.Buffer
-    t := template.Must(template.New("analyse").Parse(tmpl))
-    t.Execute(&buf, batch)
-    
-    return buf.String()
-}
++ {{if gt .TotalBatches 1}}
++ **Note:** This is batch {{.BatchNum}} of {{.TotalBatches}}.
++ Previous batches have been processed.
++ {{end}}
 ```
 
 ## Configuration
-
-Add optional config for tuning:
 
 ```yaml
 analysis:
   max_files_per_batch: 500
   max_chars_per_batch: 50000
-  context_reserve_tokens: 50000  # Reserved for prompt + response
+  context_reserve_tokens: 50000
 ```
 
-## Testing
+## TODO
 
-1. **Small repo (<100 files):** Single batch, no change in behavior
-2. **Medium repo (100-500 files):** Single batch with relative paths
-3. **Large repo (500-5000 files):** Multiple batches, sequential processing
-4. **Huge repo (>5000 files):** Many batches, verify index consistency
-
-## Future Improvements
-
-1. **Smart batching by module:** Group related files into same batch
-2. **Parallel batch processing:** With proper merge strategy
-3. **Incremental context:** Only send diff from previous batch
-4. **File content preview:** Include first N lines of each file for better context
+- [ ] Add `AnalysisBatch` struct
+- [ ] Implement `estimateTokens()` function
+- [ ] Implement `toRelativePaths()` function
+- [ ] Implement `splitIntoBatches()` function
+- [ ] Update `Analyse()` to use batching
+- [ ] Update `prompts/analyse.md` template
+- [ ] Add configuration options
+- [ ] Test with small repo (<100 files)
+- [ ] Test with large repo (>1000 files)

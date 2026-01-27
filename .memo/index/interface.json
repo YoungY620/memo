@@ -94,9 +94,15 @@
     },
     {
       "type": "callback",
+      "name": "generateSessionID(workDir string) string",
+      "params": "workDir: absolute path to the project directory",
+      "description": "Creates a deterministic session ID based on working directory path. Uses SHA256 hash of workDir, takes first 8 hex chars, returns 'memo-<hash>' format (e.g., 'memo-a7c3f2b1'). Same project always gets same session ID."
+    },
+    {
+      "type": "callback",
       "name": "Analyser.Analyse(ctx, changedFiles []string)",
       "params": "ctx: context for cancellation, changedFiles: list of changed file paths",
-      "description": "Main analysis entry point. Creates a kimi-agent-sdk session using local MCP config (.memo/mcp.json) to prevent loading user's ~/.kimi/mcp.json. Sends prompts to AI agent, validates output, retries with feedback on validation failures (up to 5 attempts)."
+      "description": "Main analysis entry point. Creates a kimi-agent-sdk session using local MCP config (.memo/mcp.json) to prevent loading user's ~/.kimi/mcp.json, and uses a deterministic session ID (memo-<workdir-hash>) to prevent session pollution. Sends prompts to AI agent, validates output, retries with feedback on validation failures (up to 5 attempts)."
     },
     {
       "type": "callback",

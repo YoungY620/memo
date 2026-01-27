@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -15,6 +17,10 @@ import (
 //go:embed prompts/*.md
 var promptFS embed.FS
 
+// sessionPrefix is the prefix for memo-generated session IDs.
+// This distinguishes memo sessions from user interactive sessions.
+const sessionPrefix = "memo-"
+
 func loadPrompt(name string) string {
 	data, err := promptFS.ReadFile("prompts/" + name + ".md")
 	if err != nil {
@@ -25,16 +31,29 @@ func loadPrompt(name string) string {
 }
 
 type Analyser struct {
-	cfg      *Config
-	indexDir string
-	workDir  string
+	cfg       *Config
+	indexDir  string
+	workDir   string
+	sessionID string
+}
+
+// generateSessionID creates a deterministic session ID based on work directory
+// Format: <sessionPrefix><8-char-hash-of-workdir>
+func generateSessionID(workDir string) string {
+	hash := sha256.Sum256([]byte(workDir))
+	shortHash := hex.EncodeToString(hash[:4]) // 8 hex chars
+	return sessionPrefix + shortHash
 }
 
 func NewAnalyser(cfg *Config, workDir string) *Analyser {
+	sessionID := generateSessionID(workDir)
+	logInfo("Using session ID: %s for workDir: %s", sessionID, workDir)
+
 	return &Analyser{
-		cfg:      cfg,
-		indexDir: filepath.Join(workDir, ".memo", "index"),
-		workDir:  workDir,
+		cfg:       cfg,
+		indexDir:  filepath.Join(workDir, ".memo", "index"),
+		workDir:   workDir,
+		sessionID: sessionID,
 	}
 }
 
@@ -57,6 +76,7 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
 			agent.WithMCPConfigFile(mcpFile),
+			agent.WithSession(a.sessionID),
 		)
 	} else {
 		logDebug("Using kimi default configuration")
@@ -64,6 +84,7 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
 			agent.WithMCPConfigFile(mcpFile),
+			agent.WithSession(a.sessionID),
 		)
 	}
 	if err != nil {
