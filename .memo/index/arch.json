@@ -17,8 +17,8 @@
     },
     {
       "name": "analyser",
-      "description": "AI-powered analysis engine. Uses kimi-agent-sdk to create a session with local MCP config (.memo/mcp.json) to prevent infinite recursion, sends prompts (context + analyse) to the AI agent, and runs a validation loop with feedback prompts if the generated JSON files fail schema validation. Uses LineBuffer for clean streaming output.",
-      "interfaces": "NewAnalyser(cfg, workDir) creates analyser. Analyse(ctx, changedFiles) runs analysis with up to 5 retry attempts. Loads prompts from embedded prompts/*.md files. Calls ValidateIndex after each AI response. runPrompt(ctx, session, prompt) handles sending prompts and processing streamed responses with LineBuffer."
+      "description": "AI-powered analysis engine. Uses kimi-agent-sdk to create a session with local MCP config (.memo/mcp.json) to prevent infinite recursion. Generates a deterministic session ID (memo-<8-char-hash>) based on working directory path for session reuse. Sends prompts (context + analyse) to the AI agent, and runs a validation loop with feedback prompts if the generated JSON files fail schema validation. Uses LineBuffer for clean streaming output.",
+      "interfaces": "NewAnalyser(cfg, workDir) creates analyser with deterministic session ID. generateSessionID(workDir) creates 'memo-<hash>' format ID. Analyse(ctx, changedFiles) runs analysis with up to 5 retry attempts. Loads prompts from embedded prompts/*.md files. Calls ValidateIndex after each AI response. runPrompt(ctx, session, prompt) handles sending prompts and processing streamed responses with LineBuffer."
     },
     {
       "name": "validator",
