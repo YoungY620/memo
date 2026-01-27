@@ -1,31 +1,33 @@
 # Memo
 
-AI-powered codebase memory keeper. Watches file changes and maintains `.memo` documentation for coding agents.
+AI-powered codebase memory for coding agents. Watches file changes and maintains `.memo` documentation automatically.
 
 ## Installation
-
-Build from source:
 
 ```bash
 git clone https://github.com/YoungY620/memo.git
 cd memo
-make install  # builds and installs to ~/.local/bin
-memo --version
+make install  # installs to ~/.local/bin
 ```
+
+## Why Memo?
+
+Vibe coding with AI agents across multiple sessions evolves fast—too fast for humans to keep up. Projects spiral out of control due to lack of **global consistency** : models can't read the entire codebase in one pass, and neither can humans.
+
+Inspired by traditional code indexing, Memo maintains a semantic index specifically for coding agents, capturing architecture and key decisions. This enables:
+
+- **"Summarize this repo"** — No need to read every file. Memo provides instant context.
+- **Preserve design decisions** — Trade-offs and constraints are recorded once, not repeated every session.
+- **Holistic refactoring** — After modifying a module, agents can update related code across the project, even connections that static analysis can't detect.
+- **Large document navigation** — Find related content without scanning everything.
 
 ## Usage
 
 ```bash
-# Watch current directory
-memo
-
-# Watch specific directory
-memo --path /path/to/project
-
-# Use custom config
-memo --config /path/to/config.yaml
-
-# Show version
+memo                        # watch current directory
+memo --path /path/to/repo   # watch specific directory
+memo --config config.yaml   # custom config
+memo --once                 # analyze once and exit
 memo --version
 ```
 
@@ -46,14 +48,14 @@ watch:
   max_wait_ms: 300000  # 5min max wait
 ```
 
-## Kimi CLI MCP Integration
+## MCP Integration (Kimi CLI)
 
-Memo can be used as an MCP server with Kimi CLI. This enables two MCP tools:
+Memo provides two MCP tools for Kimi CLI:
 
-- `memo_list_keys`: List available keys at a path in `.memo/index` JSON files
-- `memo_get_value`: Get JSON value at a path in `.memo/index` files
+- `memo_list_keys` — List keys at a JSON path in `.memo/index`
+- `memo_get_value` — Get value at a JSON path in `.memo/index`
 
-### Option 1: MCP server + manual watcher (recommended)
+### Option 1: Separate watcher (recommended)
 
 Add to `~/.kimi/mcp.json`:
 
@@ -68,15 +70,13 @@ Add to `~/.kimi/mcp.json`:
 }
 ```
 
-Then run the watcher manually in a separate terminal:
+Run watcher in a separate terminal to see real-time output:
 
 ```bash
 memo --path /path/to/project
 ```
 
-This way you can monitor the watcher's real-time analysis output while Kimi CLI uses the MCP tools.
-
-### Option 2: All-in-one (experimental)
+### Option 2: All-in-one
 
 ```json
 {
@@ -89,36 +89,28 @@ This way you can monitor the watcher's real-time analysis output while Kimi CLI 
 }
 ```
 
-The `--mcp-with-watcher` flag runs both the MCP server and file watcher together. This is convenient but hides watcher output, making it harder to diagnose issues.
+Runs MCP server and watcher together. Convenient but hides watcher output.
 
-### Testing
+### Verify
 
-To verify the MCP integration is working:
+```bash
+kimi
+> Summarize this repo
+```
 
-1. Open a new Kimi CLI session in your project directory:
-   ```bash
-   kimi
-   ```
-
-2. Ask Kimi to summarize the repo:
-   ```
-   Summarize this repo for me
-   ```
-
-Kimi should use the `memo_list_keys` and `memo_get_value` tools to read the `.memo/index` files and provide a summary.
+Kimi will use memo tools to read `.memo/index` and provide a summary.
 
 ## Output
-
-Memo maintains `.memo/` directory with:
 
 ```
 .memo/
 ├── index/
-│   ├── arch.json       # Module definitions
-│   ├── interface.json  # External/internal interfaces
-│   ├── stories.json    # User stories and call chains
-│   └── issues.json     # Design decisions, TODOs, bugs
-└── mcp.json            # Local MCP config (prevents infinite recursion)
+│   ├── arch.json       # modules and structure
+│   ├── interface.json  # external/internal APIs
+│   ├── stories.json    # user stories and flows
+│   └── issues.json     # TODOs, decisions, bugs
+├── mcp.json            # local MCP config
+└── .gitignore          # excludes runtime files
 ```
 
 ## License
