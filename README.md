@@ -134,7 +134,7 @@ Memo maintains `.memo/` directory with:
 │   ├── interface.json  # External/internal interfaces
 │   ├── stories.json    # User stories and call chains
 │   └── issues.json     # Design decisions, TODOs, bugs
-└── config.yml          # Local repo configuration (reserved)
+└── mcp.json            # Local MCP config (prevents infinite recursion)
 ```
 
 ## License

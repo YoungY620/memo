@@ -402,7 +402,41 @@
         {
           "file": "main.go",
           "keyword": "mcp.json",
-          "line": 131
+          "line": 185
+        }
+      ]
+    },
+    {
+      "tags": ["todo"],
+      "title": "MCP infinite recursion fix needs testing verification",
+      "description": "The fix for MCP infinite recursion (using local .memo/mcp.json) was implemented but the spec file (spec/fix-mcp-infinite-recursion.md) has unchecked TODO items: (1) Test that no recursion occurs when memo is in ~/.kimi/mcp.json, (2) Test that watcher analysis still works correctly with the new MCP config isolation. These tests should be added or manually verified.",
+      "locations": [
+        {
+          "file": "spec/fix-mcp-infinite-recursion.md",
+          "keyword": "TODO",
+          "line": 189
+        }
+      ]
+    },
+    {
+      "tags": ["todo", "design-decision", "optimization"],
+      "title": "Batched analysis for large codebases to prevent context overflow",
+      "description": "When the codebase is very large (thousands of files), the file path list alone can exceed the LLM context window limit. The proposed solution includes: (1) Use relative paths instead of absolute paths to reduce token usage, (2) Estimate token usage before analysis and check against context limit, (3) Split files into batches when needed (max 500 files or 50K chars per batch), (4) Process batches sequentially with incremental index updates. Implementation requires changes to analyser.go (AnalysisBatch struct, splitIntoBatches function) and prompts/analyse.md (batch number, working directory context). Optional config fields: max_files_per_batch, max_chars_per_batch, context_reserve_tokens.",
+      "locations": [
+        {
+          "file": "spec/fix-large-codebase-context-overflow.md",
+          "keyword": "Context Overflow",
+          "line": 1
+        },
+        {
+          "file": "analyser.go",
+          "keyword": "Analyse",
+          "line": 41
+        },
+        {
+          "file": "prompts/analyse.md",
+          "keyword": "changed files",
+          "line": 51
         }
       ]
     }
