@@ -55,7 +55,7 @@ Memo provides two MCP tools for Kimi CLI:
 - `memo_list_keys` — List keys at a JSON path in `.memo/index`
 - `memo_get_value` — Get value at a JSON path in `.memo/index`
 
-### Option 1: Separate watcher (recommended)
+### Setup
 
 Add to `~/.kimi/mcp.json`:
 
@@ -75,21 +75,6 @@ Run watcher in a separate terminal to see real-time output:
 ```bash
 memo --path /path/to/project
 ```
-
-### Option 2: All-in-one
-
-```json
-{
-  "mcpServers": {
-    "memo": {
-      "command": "memo",
-      "args": ["--mcp-with-watcher"]
-    }
-  }
-}
-```
-
-Runs MCP server and watcher together. Convenient but hides watcher output.
 
 ### Verify
 
