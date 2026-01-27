@@ -12,7 +12,7 @@ make install  # installs to ~/.local/bin
 
 ## Why Memo?
 
-Vibe coding with AI agents across multiple sessions evolves fast—too fast for humans to keep up. Projects spiral out of control due to lack of **global consistency** : models can't read the entire codebase in one pass, and neither can humans.
+Vibe coding with AI agents across multiple sessions evolves fast—too fast for humans to keep up. Projects spiral out of control due to lack of **global consistency**: models can't read the entire codebase in one pass, and neither can humans.
 
 Inspired by traditional code indexing, Memo maintains a semantic index specifically for coding agents, capturing architecture and key decisions. This enables:
 
@@ -97,4 +97,8 @@ Kimi will use memo tools to read `.memo/index` and provide a summary.
 ├── mcp.json            # local MCP config
 └── .gitignore          # excludes runtime files
 ```
+
+## License
+
+MIT
 
