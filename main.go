@@ -208,5 +208,18 @@ func initIndex(indexDir string) error {
 		}
 	}
 
+	// Create .gitignore to exclude runtime files from version control
+	gitignoreFile := filepath.Join(memoDir, ".gitignore")
+	if _, err := os.Stat(gitignoreFile); os.IsNotExist(err) {
+		gitignoreContent := `# Runtime files - do not commit
+watcher.lock
+status.json
+`
+		logDebug("Creating %s", gitignoreFile)
+		if err := os.WriteFile(gitignoreFile, []byte(gitignoreContent), 0644); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
