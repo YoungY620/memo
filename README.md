@@ -21,6 +21,17 @@ Inspired by traditional code indexing, Memo maintains a semantic index specifica
 - **Holistic refactoring** — After modifying a module, agents can update related code across the project, even connections that static analysis can't detect.
 - **Beyond coding: Large document navigation** — Find related content without scanning everything.
 
+## Benchmark
+
+Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instances, limited by time):
+
+![Performance Analysis](performance_analysis_final.png)
+
+**Key findings:**
+- **4× pass rate improvement** (4.3% → 17.4%)
+- **15% faster inference** (212s → 180s per instance)
+- Memo index generation is one-time cost, amortized across tasks
+
 ## Usage
 
 ```bash
