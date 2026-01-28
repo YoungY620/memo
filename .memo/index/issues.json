@@ -25,12 +25,12 @@
         {
           "file": "analyser.go",
           "keyword": "maxRetries",
-          "line": 120
+          "line": 201
         },
         {
           "file": "analyser.go",
           "keyword": "feedbackPrompt",
-          "line": 132
+          "line": 213
         }
       ]
     },
@@ -42,7 +42,7 @@
         {
           "file": "analyser.go",
           "keyword": "kimi defaults",
-          "line": 81
+          "line": 156
         },
         {
           "file": "config.yaml",
@@ -88,7 +88,7 @@
         {
           "file": "analyser.go",
           "keyword": "WithAutoApprove",
-          "line": 88
+          "line": 163
         }
       ]
     },
@@ -100,7 +100,7 @@
         {
           "file": "analyser.go",
           "keyword": "NewLineBuffer",
-          "line": 151
+          "line": 232
         },
         {
           "file": "log.go",
@@ -353,49 +353,12 @@
         {
           "file": "analyser.go",
           "keyword": "500 * time.Millisecond",
-          "line": 151
+          "line": 232
         }
       ]
     },
-    {
-      "tags": ["outdated-docs"],
-      "title": "README.md missing documentation for --once and --log-level flags",
-      "description": "The README.md Usage section documents --path, --config, and --version flags, and has an MCP Integration section for --mcp-with-watcher. However, it is missing documentation for: --once (one-shot mode for CI/CD) and --log-level (log verbosity override). These flags are implemented in main.go but not documented in the user-facing README.",
-      "locations": [
-        {
-          "file": "README.md",
-          "keyword": "## Usage",
-          "line": 32
-        },
-        {
-          "file": "main.go",
-          "keyword": "flag.Parse",
-          "line": 29
-        }
-      ]
-    },
-    {
-      "tags": ["outdated-docs"],
-      "title": "Go version inconsistency between version files",
-      "description": "The Go version is specified inconsistently across different files: .go-version says '1.25', .tool-versions says 'golang 1.25.6', and go.mod says 'go 1.25.5'. These should be aligned to avoid confusion for contributors setting up their development environment.",
-      "locations": [
-        {
-          "file": ".go-version",
-          "keyword": "1.25",
-          "line": 1
-        },
-        {
-          "file": ".tool-versions",
-          "keyword": "golang 1.25.6",
-          "line": 1
-        },
-        {
-          "file": "go.mod",
-          "keyword": "go 1.25.5",
-          "line": 3
-        }
-      ]
-    },
+
+
     {
       "tags": ["design-decision"],
       "title": "Local MCP config to prevent infinite recursion",
@@ -409,7 +372,7 @@
         {
           "file": "analyser.go",
           "keyword": "WithMCPConfigFile",
-          "line": 89
+          "line": 164
         },
         {
           "file": "main.go",
@@ -431,24 +394,34 @@
       ]
     },
     {
-      "tags": ["todo", "design-decision", "optimization"],
+      "tags": ["design-decision", "optimization"],
       "title": "Batched analysis for large codebases to prevent context overflow",
-      "description": "When the codebase is very large (thousands of files), the file path list alone can exceed the LLM context window limit. The proposed solution includes: (1) Use relative paths instead of absolute paths to reduce token usage, (2) Estimate token usage before analysis and check against context limit, (3) Split files into batches when needed (max 500 files or 50K chars per batch), (4) Process batches sequentially with incremental index updates. Implementation requires changes to analyser.go (AnalysisBatch struct, splitIntoBatches function) and prompts/analyse.md (batch number, working directory context). Optional config fields: max_files_per_batch, max_chars_per_batch, context_reserve_tokens.",
+      "description": "IMPLEMENTED: When the codebase is very large (thousands of files), the file path list alone can exceed the LLM context window limit. The solution: (1) toRelativePaths() converts absolute paths to relative paths, reducing token usage, (2) splitIntoBatches() recursively splits files by directory when count exceeds threshold (default 100 files), (3) Analyse() processes batches sequentially, calling analyseBatch() for each, (4) analyseBatch() adds batch info to prompt ('Batch X of Y') so the AI knows context. The recursive splitting groups related files by directory and only splits further when a directory exceeds the threshold.",
       "locations": [
+        {
+          "file": "analyser.go",
+          "keyword": "toRelativePaths",
+          "line": 53
+        },
+        {
+          "file": "analyser.go",
+          "keyword": "splitIntoBatches",
+          "line": 66
+        },
+        {
+          "file": "analyser.go",
+          "keyword": "maxFilesPerBatch",
+          "line": 26
+        },
+        {
+          "file": "analyser.go",
+          "keyword": "analyseBatch",
+          "line": 146
+        },
         {
           "file": "spec/fix-large-codebase-context-overflow.md",
           "keyword": "Context Overflow",
           "line": 1
-        },
-        {
-          "file": "analyser.go",
-          "keyword": "Analyse",
-          "line": 60
-        },
-        {
-          "file": "prompts/analyse.md",
-          "keyword": "changed files",
-          "line": 51
         }
       ]
     },
@@ -470,7 +443,7 @@
         {
           "file": "analyser.go",
           "keyword": "SetStatus",
-          "line": 65
+          "line": 127
         },
         {
           "file": "mcp/server.go",
@@ -497,12 +470,12 @@
         {
           "file": "analyser.go",
           "keyword": "generateSessionID",
-          "line": 42
+          "line": 46
         },
         {
           "file": "analyser.go",
           "keyword": "sessionID",
-          "line": 37
+          "line": 41
         },
         {
           "file": "spec/fix-session-id-pollution.md",

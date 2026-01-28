@@ -112,9 +112,27 @@
     },
     {
       "type": "callback",
+      "name": "toRelativePaths(files []string, workDir string) []string",
+      "params": "files: list of absolute file paths, workDir: base directory",
+      "description": "Converts absolute file paths to relative paths based on workDir. Uses filepath.Rel() for each path. Falls back to absolute path if conversion fails. Used to reduce token usage in prompts."
+    },
+    {
+      "type": "callback",
+      "name": "splitIntoBatches(files []string, threshold int) [][]string",
+      "params": "files: list of relative file paths, threshold: max files per batch (default 100)",
+      "description": "Splits files into batches using recursive directory-based grouping. If count <= threshold, returns single batch. Otherwise groups by top-level directory, then recursively splits directories that exceed threshold. Keeps related files together."
+    },
+    {
+      "type": "callback",
       "name": "Analyser.Analyse(ctx, changedFiles []string)",
-      "params": "ctx: context for cancellation, changedFiles: list of changed file paths",
-      "description": "Main analysis entry point. Creates a kimi-agent-sdk session using local MCP config (.memo/mcp.json) to prevent loading user's ~/.kimi/mcp.json, and uses a deterministic session ID (memo-<workdir-hash>) to prevent session pollution. Sends prompts to AI agent, validates output, retries with feedback on validation failures (up to 5 attempts)."
+      "params": "ctx: context for cancellation, changedFiles: list of absolute file paths",
+      "description": "Main analysis entry point with batching support. Converts absolute paths to relative via toRelativePaths(), splits files into batches via splitIntoBatches() when count exceeds maxFilesPerBatch (100), then processes each batch sequentially via analyseBatch(). Sets status to 'analyzing' at start and 'idle' at end."
+    },
+    {
+      "type": "callback",
+      "name": "Analyser.analyseBatch(ctx, files []string, batchNum, totalBatches int) error",
+      "params": "ctx: context, files: relative file paths for this batch, batchNum/totalBatches: batch position info",
+      "description": "Processes one batch of files. Creates kimi-agent-sdk session with local MCP config (.memo/mcp.json) and deterministic session ID. Adds batch info to prompt ('Batch X of Y') when multiple batches. Runs validation loop with up to 5 retries on failure."
     },
     {
       "type": "callback",
