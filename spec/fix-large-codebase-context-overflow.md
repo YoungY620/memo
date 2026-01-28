@@ -4,8 +4,7 @@ Prevent context window overflow when analyzing large codebases by using relative
 
 ## Status
 
-- [ ] Not implemented
-- [ ] Pending
+- [x] Implemented
 
 ## Problem
 
@@ -256,7 +255,8 @@ analysis:
 
 ## TODO
 
-- [ ] Implement `splitIntoBatches()` 
-- [ ] Update `Analyse()` to use batching
-- [ ] Update `prompts/analyse.md` with batch info
+- [x] Implement `splitIntoBatches()` 
+- [x] Implement `toRelativePaths()`
+- [x] Update `Analyse()` to use batching
+- [x] Add batch info to prompt dynamically
 - [ ] Test with large codebase

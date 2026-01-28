@@ -21,6 +21,10 @@ var promptFS embed.FS
 // This distinguishes memo sessions from user interactive sessions.
 const sessionPrefix = "memo-"
 
+// maxFilesPerBatch is the threshold for splitting files into batches.
+// When file count exceeds this, files are split by directory.
+const maxFilesPerBatch = 100
+
 func loadPrompt(name string) string {
 	data, err := promptFS.ReadFile("prompts/" + name + ".md")
 	if err != nil {
@@ -45,6 +49,59 @@ func generateSessionID(workDir string) string {
 	return sessionPrefix + shortHash
 }
 
+// toRelativePaths converts absolute paths to relative paths based on workDir
+func toRelativePaths(files []string, workDir string) []string {
+	rel := make([]string, 0, len(files))
+	for _, f := range files {
+		r, err := filepath.Rel(workDir, f)
+		if err != nil {
+			r = f
+		}
+		rel = append(rel, r)
+	}
+	return rel
+}
+
+// splitIntoBatches splits files into batches by directory when count > threshold
+func splitIntoBatches(files []string, threshold int) [][]string {
+	if len(files) <= threshold {
+		return [][]string{files}
+	}
+
+	// Group by first path component (top-level dir)
+	groups := make(map[string][]string)
+	for _, f := range files {
+		parts := strings.SplitN(f, string(filepath.Separator), 2)
+		dir := parts[0]
+		groups[dir] = append(groups[dir], f)
+	}
+
+	var batches [][]string
+	for dir, dirFiles := range groups {
+		if len(dirFiles) <= threshold {
+			batches = append(batches, dirFiles)
+		} else {
+			// Strip prefix, recurse, restore prefix
+			var sub []string
+			for _, f := range dirFiles {
+				if idx := strings.Index(f, string(filepath.Separator)); idx >= 0 {
+					sub = append(sub, f[idx+1:])
+				} else {
+					sub = append(sub, f)
+				}
+			}
+			for _, b := range splitIntoBatches(sub, threshold) {
+				restored := make([]string, len(b))
+				for i, f := range b {
+					restored[i] = filepath.Join(dir, f)
+				}
+				batches = append(batches, restored)
+			}
+		}
+	}
+	return batches
+}
+
 func NewAnalyser(cfg *Config, workDir string) *Analyser {
 	sessionID := generateSessionID(workDir)
 	logInfo("Using session ID: %s for workDir: %s", sessionID, workDir)
@@ -58,7 +115,12 @@ func NewAnalyser(cfg *Config, workDir string) *Analyser {
 }
 
 func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
-	logInfo("Starting analysis for %d files", len(changedFiles))
+	// Convert to relative paths
+	relFiles := toRelativePaths(changedFiles, a.workDir)
+
+	// Split into batches if needed
+	batches := splitIntoBatches(relFiles, maxFilesPerBatch)
+	logInfo("Starting analysis for %d files in %d batch(es)", len(changedFiles), len(batches))
 
 	// Mark analysis in progress
 	memoDir := filepath.Dir(a.indexDir)
@@ -70,6 +132,19 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 			logError("Failed to clear status: %v", err)
 		}
 	}()
+
+	// Process each batch
+	for i, batch := range batches {
+		if err := a.analyseBatch(ctx, batch, i+1, len(batches)); err != nil {
+			return fmt.Errorf("batch %d/%d failed: %w", i+1, len(batches), err)
+		}
+	}
+
+	return nil
+}
+
+func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, totalBatches int) error {
+	logInfo("Processing batch %d/%d (%d files)", batchNum, totalBatches, len(files))
 
 	var session *agent.Session
 	var err error
@@ -107,8 +182,14 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	contextPrompt := loadPrompt("context")
 	analysePrompt := loadPrompt("analyse")
 
-	filesInfo := "Changed files:\n" + strings.Join(changedFiles, "\n")
-	initialPrompt := contextPrompt + "\n\n" + analysePrompt + "\n\n" + filesInfo
+	// Add batch info if multiple batches
+	var batchInfo string
+	if totalBatches > 1 {
+		batchInfo = fmt.Sprintf("\n\n## Batch %d of %d\n\nThis is batch %d of %d. Previous batches have been processed. Focus on the files in this batch.", batchNum, totalBatches, batchNum, totalBatches)
+	}
+
+	filesInfo := "\n\nChanged files (relative to working directory):\n" + strings.Join(files, "\n")
+	initialPrompt := contextPrompt + "\n\n" + analysePrompt + batchInfo + filesInfo
 
 	// Send initial prompt
 	logDebug("Sending initial analysis prompt")
@@ -122,7 +203,7 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 		logDebug("Validating .memo/index files (attempt %d/%d)", i+1, maxRetries)
 		result := ValidateIndex(a.indexDir)
 		if result.Valid {
-			logInfo("Validation passed")
+			logInfo("Batch %d/%d validation passed", batchNum, totalBatches)
 			return nil
 		}
 
