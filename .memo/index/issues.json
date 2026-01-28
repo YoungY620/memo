@@ -268,24 +268,24 @@
         {
           "file": "mcp/server.go",
           "keyword": "schemaDesc",
-          "line": 128
+          "line": 254
         },
         {
           "file": "mcp/server.go",
           "keyword": "tools()",
-          "line": 154
+          "line": 276
         }
       ]
     },
     {
       "tags": ["design-decision"],
-      "title": "MCP tool descriptions include whenToUse guidance for LLMs",
-      "description": "MCP tool descriptions embed a 'whenToUse' constant explaining when LLMs should use memo tools FIRST - specifically for understanding, summarizing, exploring, or navigating codebases. Lists typical requests (summarize repo, show architecture, find issues) and explains why memo is better than reading files directly (pre-indexed, structured, efficient, contextual). This guides LLMs to use the indexed documentation before attempting to scan the filesystem.",
+      "title": "MCP tool descriptions include mandatory whenToUse guidance for LLMs",
+      "description": "MCP tool descriptions embed a 'whenToUse' constant with a strong directive: LLMs should ALWAYS check project state via memo BEFORE doing anything - coding, debugging, refactoring, or answering questions. The guidance emphasizes that no matter what task, LLMs MUST first use memo to understand current project state before making any changes or decisions. Lists specific scenarios (before writing code, debugging, refactoring, answering questions) and explains why memo is better than reading files directly (pre-indexed, structured, efficient, accurate). This ensures LLMs have accurate, up-to-date context before starting any work.",
       "locations": [
         {
           "file": "mcp/server.go",
           "keyword": "whenToUse",
-          "line": 134
+          "line": 260
         }
       ]
     },
@@ -448,7 +448,7 @@
         {
           "file": "mcp/server.go",
           "keyword": "getStatus",
-          "line": 114
+          "line": 239
         },
         {
           "file": "main.go",
