@@ -108,7 +108,7 @@
       "type": "callback",
       "name": "Watcher.Flush()",
       "params": "none",
-      "description": "Immediately processes all pending file changes, stopping both debounce and max-wait timers. Called by internal timers, but now public to support once-mode where main.go can trigger flush directly after ScanAll()."
+      "description": "Processes pending file changes with concurrent analysis guard. Uses non-blocking semaphore acquisition via capacity-1 channel: if analysis is already running, the flush returns immediately (files remain in pending for next timer). If acquired, stops both debounce and max-wait timers, collects pending files, calls onChange callback. Semaphore is released via defer after analysis completes. Called by internal timers, also public for once-mode support."
     },
     {
       "type": "callback",
