@@ -49,23 +49,20 @@ Result: Overflow before analysis begins
                             │
                             ▼
                  ┌─────────────────────┐
-                 │ Convert to relative │
-                 │ paths               │
+                 │ len(files) >        │
+                 │ threshold?          │
                  └─────────────────────┘
-                            │
-                            ▼
-                 ┌─────────────────────┐
-                 │ Group by directory  │
-                 │ (common path)       │
-                 └─────────────────────┘
-                            │
-                            ▼
-                 ┌─────────────────────┐
-                 │ Pack groups into    │
-                 │ batches (bin-pack)  │
-                 └─────────────────────┘
-                            │
-                            ▼
+                   │               │
+                  Yes              No
+                   │               │
+                   ▼               ▼
+        ┌──────────────────┐  ┌──────────────────┐
+        │ Split by        │  │ Single batch     │
+        │ directory       │  │ (no split)       │
+        │ (recursive)     │  └──────────────────┘
+        └──────────────────┘
+                   │
+                   ▼
         ┌──────────────────┐
         │ For each batch:  │
         │ 1. Build prompt  │
@@ -74,35 +71,55 @@ Result: Overflow before analysis begins
         └──────────────────┘
 ```
 
-### Directory Grouping Strategy
+### Recursive Directory Splitting Strategy
 
-Files are grouped by their parent directory to keep related files together:
+Only split when file count exceeds threshold. Split by top-level directories first, then recursively split any directory that still exceeds the threshold.
 
 ```
-Input files:
-  src/api/handler.go
-  src/api/router.go
-  src/api/middleware.go
-  src/db/model.go
-  src/db/query.go
-  pkg/util/helper.go
-  main.go
+Threshold: 100 files
 
-Grouped by directory:
-  "src/api"  → [handler.go, router.go, middleware.go]
-  "src/db"   → [model.go, query.go]
-  "pkg/util" → [helper.go]
-  "."        → [main.go]
+Input: 250 files across the project
+  src/api/      (80 files)  → ✔ under threshold, batch as-is
+  src/db/       (120 files) → ✘ over threshold, split further
+    src/db/models/  (60 files)  → ✔ batch
+    src/db/queries/ (60 files)  → ✔ batch
+  pkg/          (30 files)  → ✔ under threshold, batch as-is
+  root files    (20 files)  → ✔ under threshold, batch as-is
 
-Batch packing (max 500 files, 50K chars):
-  Batch 1: src/api/* + src/db/* + pkg/util/* + main.go
-  (if fits within limits, otherwise split)
+Result: 4 batches
+  Batch 1: src/api/* (80 files)
+  Batch 2: src/db/models/* (60 files)
+  Batch 3: src/db/queries/* (60 files)
+  Batch 4: pkg/* + root files (50 files)
+```
+
+### Algorithm
+
+```
+splitIntoBatches(files, threshold):
+  if len(files) <= threshold:
+    return [files]  // single batch, no split needed
+  
+  // Group by top-level directory
+  groups = groupByTopDir(files)
+  
+  batches = []
+  for dir, dirFiles in groups:
+    if len(dirFiles) <= threshold:
+      batches.append(dirFiles)
+    else:
+      // Recursively split this directory
+      subBatches = splitIntoBatches(dirFiles, threshold)
+      batches.extend(subBatches)
+  
+  return batches
 ```
 
 Benefits:
-- Related files analyzed together → better context understanding
-- Module boundaries preserved → more coherent index updates
-- Reduces redundant file reads across batches
+- No unnecessary splitting for small changesets
+- Related files stay together when possible
+- Deep directories split only when needed
+- Preserves module boundaries
 
 ## Files
 
@@ -145,80 +162,91 @@ Benefits:
 +     return rel
 + }
 
-+ // groupByDirectory groups files by their parent directory
-+ func groupByDirectory(files []string) map[string][]string {
++ // groupByTopDir groups files by their top-level directory component
++ // e.g., "src/api/handler.go" -> "src", "main.go" -> "."
++ func groupByTopDir(files []string) map[string][]string {
 +     groups := make(map[string][]string)
 +     for _, f := range files {
-+         dir := filepath.Dir(f)
-+         groups[dir] = append(groups[dir], f)
++         parts := strings.SplitN(f, string(filepath.Separator), 2)
++         var topDir string
++         if len(parts) == 1 {
++             topDir = "."  // root level file
++         } else {
++             topDir = parts[0]
++         }
++         groups[topDir] = append(groups[topDir], f)
 +     }
 +     return groups
 + }
 
-+ // sortedDirKeys returns directory keys sorted by path depth (shallow first)
-+ func sortedDirKeys(groups map[string][]string) []string {
-+     keys := make([]string, 0, len(groups))
-+     for k := range groups {
-+         keys = append(keys, k)
-+     }
-+     sort.Slice(keys, func(i, j int) bool {
-+         // Sort by depth first, then alphabetically
-+         di := strings.Count(keys[i], string(filepath.Separator))
-+         dj := strings.Count(keys[j], string(filepath.Separator))
-+         if di != dj {
-+             return di < dj
-+         }
-+         return keys[i] < keys[j]
-+     })
-+     return keys
-+ }
-
++ // splitIntoBatches recursively splits files by directory when exceeding threshold
 + func (a *Analyser) splitIntoBatches(files []string) [][]string {
-+     // Group files by directory
-+     groups := groupByDirectory(files)
-+     dirs := sortedDirKeys(groups)
++     // No split needed if under threshold
++     if len(files) <= maxFilesPerBatch {
++         return [][]string{files}
++     }
++     
++     // Group by top-level directory
++     groups := groupByTopDir(files)
 +     
 +     var batches [][]string
-+     var batch []string
-+     var chars int
++     var smallGroups []string  // accumulate small groups to merge
++     
++     // Sort directory names for deterministic order
++     dirs := make([]string, 0, len(groups))
++     for dir := range groups {
++         dirs = append(dirs, dir)
++     }
++     sort.Strings(dirs)
 +     
 +     for _, dir := range dirs {
 +         dirFiles := groups[dir]
-+         dirChars := 0
-+         for _, f := range dirFiles {
-+             dirChars += len(f) + 3  // +3 for "- " prefix and newline
-+         }
 +         
-+         // If adding this directory exceeds limits, flush current batch
-+         if len(batch) > 0 && (len(batch)+len(dirFiles) > maxFilesPerBatch || chars+dirChars > maxCharsPerBatch) {
-+             batches = append(batches, batch)
-+             batch = nil
-+             chars = 0
-+         }
-+         
-+         // If directory itself exceeds limits, split it
-+         if len(dirFiles) > maxFilesPerBatch || dirChars > maxCharsPerBatch {
-+             for _, f := range dirFiles {
-+                 if len(batch) >= maxFilesPerBatch || chars+len(f)+3 > maxCharsPerBatch {
-+                     if len(batch) > 0 {
-+                         batches = append(batches, batch)
-+                     }
-+                     batch = nil
-+                     chars = 0
++         if len(dirFiles) <= maxFilesPerBatch {
++             // Small enough, try to merge with other small groups
++             if len(smallGroups)+len(dirFiles) <= maxFilesPerBatch {
++                 smallGroups = append(smallGroups, dirFiles...)
++             } else {
++                 // Flush smallGroups and start new
++                 if len(smallGroups) > 0 {
++                     batches = append(batches, smallGroups)
 +                 }
-+                 batch = append(batch, f)
-+                 chars += len(f) + 3
++                 smallGroups = dirFiles
 +             }
 +         } else {
-+             // Add entire directory to current batch
-+             batch = append(batch, dirFiles...)
-+             chars += dirChars
++             // Flush any pending small groups first
++             if len(smallGroups) > 0 {
++                 batches = append(batches, smallGroups)
++                 smallGroups = nil
++             }
++             // Recursively split this large directory
++             // Strip top dir and split by next level
++             subFiles := make([]string, len(dirFiles))
++             for i, f := range dirFiles {
++                 parts := strings.SplitN(f, string(filepath.Separator), 2)
++                 if len(parts) == 2 {
++                     subFiles[i] = parts[1]  // remove top dir prefix
++                 } else {
++                     subFiles[i] = f
++                 }
++             }
++             subBatches := a.splitIntoBatches(subFiles)
++             // Restore top dir prefix
++             for _, batch := range subBatches {
++                 restored := make([]string, len(batch))
++                 for i, f := range batch {
++                     restored[i] = filepath.Join(dir, f)
++                 }
++                 batches = append(batches, restored)
++             }
 +         }
 +     }
 +     
-+     if len(batch) > 0 {
-+         batches = append(batches, batch)
++     // Flush remaining small groups
++     if len(smallGroups) > 0 {
++         batches = append(batches, smallGroups)
 +     }
++     
 +     return batches
 + }
 
@@ -278,14 +306,12 @@ analysis:
 ## TODO
 
 - [ ] Add `AnalysisBatch` struct
-- [ ] Implement `estimateTokens()` function
 - [ ] Implement `toRelativePaths()` function
-- [ ] Implement `groupByDirectory()` function
-- [ ] Implement `sortedDirKeys()` function
-- [ ] Implement `splitIntoBatches()` with directory grouping
+- [ ] Implement `groupByTopDir()` function
+- [ ] Implement `splitIntoBatches()` with recursive directory splitting
 - [ ] Update `Analyse()` to use batching
 - [ ] Update `prompts/analyse.md` template
-- [ ] Add configuration options
-- [ ] Test with small repo (<100 files)
-- [ ] Test with large repo (>1000 files)
-- [ ] Test directory grouping preserves related files
+- [ ] Add configuration options (maxFilesPerBatch)
+- [ ] Test: small repo (<100 files) - no split
+- [ ] Test: large repo (>500 files) - splits by directory
+- [ ] Test: deep directory (>500 files in one dir) - recursive split
