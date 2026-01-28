@@ -162,91 +162,42 @@ Benefits:
 +     return rel
 + }
 
-+ // groupByTopDir groups files by their top-level directory component
-+ // e.g., "src/api/handler.go" -> "src", "main.go" -> "."
-+ func groupByTopDir(files []string) map[string][]string {
-+     groups := make(map[string][]string)
-+     for _, f := range files {
-+         parts := strings.SplitN(f, string(filepath.Separator), 2)
-+         var topDir string
-+         if len(parts) == 1 {
-+             topDir = "."  // root level file
-+         } else {
-+             topDir = parts[0]
-+         }
-+         groups[topDir] = append(groups[topDir], f)
-+     }
-+     return groups
-+ }
-
-+ // splitIntoBatches recursively splits files by directory when exceeding threshold
-+ func (a *Analyser) splitIntoBatches(files []string) [][]string {
-+     // No split needed if under threshold
-+     if len(files) <= maxFilesPerBatch {
++ // splitIntoBatches splits files into batches by directory when count > threshold
++ func splitIntoBatches(files []string, threshold int) [][]string {
++     if len(files) <= threshold {
 +         return [][]string{files}
 +     }
 +     
-+     // Group by top-level directory
-+     groups := groupByTopDir(files)
++     // Group by first path component (top-level dir)
++     groups := make(map[string][]string)
++     for _, f := range files {
++         dir := strings.SplitN(f, "/", 2)[0]
++         groups[dir] = append(groups[dir], f)
++     }
 +     
 +     var batches [][]string
-+     var smallGroups []string  // accumulate small groups to merge
-+     
-+     // Sort directory names for deterministic order
-+     dirs := make([]string, 0, len(groups))
-+     for dir := range groups {
-+         dirs = append(dirs, dir)
-+     }
-+     sort.Strings(dirs)
-+     
-+     for _, dir := range dirs {
-+         dirFiles := groups[dir]
-+         
-+         if len(dirFiles) <= maxFilesPerBatch {
-+             // Small enough, try to merge with other small groups
-+             if len(smallGroups)+len(dirFiles) <= maxFilesPerBatch {
-+                 smallGroups = append(smallGroups, dirFiles...)
-+             } else {
-+                 // Flush smallGroups and start new
-+                 if len(smallGroups) > 0 {
-+                     batches = append(batches, smallGroups)
-+                 }
-+                 smallGroups = dirFiles
-+             }
++     for dir, dirFiles := range groups {
++         if len(dirFiles) <= threshold {
++             batches = append(batches, dirFiles)
 +         } else {
-+             // Flush any pending small groups first
-+             if len(smallGroups) > 0 {
-+                 batches = append(batches, smallGroups)
-+                 smallGroups = nil
-+             }
-+             // Recursively split this large directory
-+             // Strip top dir and split by next level
-+             subFiles := make([]string, len(dirFiles))
-+             for i, f := range dirFiles {
-+                 parts := strings.SplitN(f, string(filepath.Separator), 2)
-+                 if len(parts) == 2 {
-+                     subFiles[i] = parts[1]  // remove top dir prefix
++             // Strip prefix, recurse, restore prefix
++             var sub []string
++             for _, f := range dirFiles {
++                 if i := strings.Index(f, "/"); i >= 0 {
++                     sub = append(sub, f[i+1:])
 +                 } else {
-+                     subFiles[i] = f
++                     sub = append(sub, f)
 +                 }
 +             }
-+             subBatches := a.splitIntoBatches(subFiles)
-+             // Restore top dir prefix
-+             for _, batch := range subBatches {
-+                 restored := make([]string, len(batch))
-+                 for i, f := range batch {
-+                     restored[i] = filepath.Join(dir, f)
++             for _, b := range splitIntoBatches(sub, threshold) {
++                 var restored []string
++                 for _, f := range b {
++                     restored = append(restored, dir+"/"+f)
 +                 }
 +                 batches = append(batches, restored)
 +             }
 +         }
 +     }
-+     
-+     // Flush remaining small groups
-+     if len(smallGroups) > 0 {
-+         batches = append(batches, smallGroups)
-+     }
-+     
 +     return batches
 + }
 
@@ -305,13 +256,7 @@ analysis:
 
 ## TODO
 
-- [ ] Add `AnalysisBatch` struct
-- [ ] Implement `toRelativePaths()` function
-- [ ] Implement `groupByTopDir()` function
-- [ ] Implement `splitIntoBatches()` with recursive directory splitting
+- [ ] Implement `splitIntoBatches()` 
 - [ ] Update `Analyse()` to use batching
-- [ ] Update `prompts/analyse.md` template
-- [ ] Add configuration options (maxFilesPerBatch)
-- [ ] Test: small repo (<100 files) - no split
-- [ ] Test: large repo (>500 files) - splits by directory
-- [ ] Test: deep directory (>500 files in one dir) - recursive split
+- [ ] Update `prompts/analyse.md` with batch info
+- [ ] Test with large codebase
