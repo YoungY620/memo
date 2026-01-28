@@ -1,6 +1,13 @@
 # Release Distribution
 
-Multi-platform package distribution using GoReleaser.
+macOS package distribution via Homebrew using GoReleaser.
+
+## Status
+
+- [x] GoReleaser config (macOS only)
+- [x] GitHub Actions workflow
+- [ ] Create `YoungY620/homebrew-tap` repository
+- [ ] Test Homebrew installation
 
 ## Quick Start
 
@@ -11,73 +18,26 @@ git push origin v0.1.0
 # GitHub Actions will automatically build and release
 ```
 
-## Distribution Channels
+## Installation (after setup)
 
-| Channel | Platform | Config | Notes |
-|---------|----------|--------|-------|
-| **GitHub Release** | All | Built-in | Binary downloads + checksums |
-| **Homebrew** | macOS/Linux | `brews` | Requires `homebrew-tap` repo |
-| **Scoop** | Windows | `scoops` | Requires `scoop-bucket` repo |
-| **APT (deb)** | Debian/Ubuntu | `nfpms` | Via GitHub Release |
-| **RPM** | RHEL/Fedora | `nfpms` | Via GitHub Release |
-| **Chocolatey** | Windows | `chocolateys` | Requires API key |
-| **AUR** | Arch Linux | `aurs` | Requires SSH key |
-
-## Setup Requirements
-
-### 1. Homebrew Tap
-
-Create repo `YoungY620/homebrew-tap`:
 ```bash
-# Users install with:
-brew tap YoungY620/homebrew-tap
+brew tap YoungY620/tap
 brew install memo
 ```
 
-### 2. Scoop Bucket
+## Setup
 
-Create repo `YoungY620/scoop-bucket`:
-```bash
-# Users install with:
-scoop bucket add memo https://github.com/YoungY620/scoop-bucket
-scoop install memo
-```
+### 1. Create Homebrew Tap Repository
 
-### 3. Chocolatey (Optional)
+Create a new GitHub repo: `YoungY620/homebrew-tap`
 
-1. Create account at https://chocolatey.org
-2. Get API key
-3. Add `CHOCOLATEY_API_KEY` to GitHub secrets
+GoReleaser will automatically push Formula to this repo on release.
 
-```powershell
-# Users install with:
-choco install memo
-```
+### 2. GitHub Secrets
 
-### 4. APT/DEB (Manual Repo)
+The `GITHUB_TOKEN` is automatically provided by GitHub Actions.
 
-For a proper APT repository, you need:
-1. Host `.deb` files on a server
-2. Create `Packages` and `Release` files
-3. Sign with GPG
-
-Simple alternative - download from GitHub:
-```bash
-# Download latest .deb
-curl -LO https://github.com/YoungY620/memo/releases/latest/download/memo_*_linux_amd64.deb
-sudo dpkg -i memo_*.deb
-```
-
-### 5. MSI Installer (Optional)
-
-Add to `.goreleaser.yaml`:
-```yaml
-# Requires WiX Toolset on Windows runner
-msi:
-  - id: memo-msi
-    name: memo
-    wxs: ./build/wix/memo.wxs
-```
+For pushing to homebrew-tap, ensure the token has `repo` scope.
 
 ## Local Testing
 
@@ -96,5 +56,13 @@ goreleaser release --snapshot --clean
 
 | File | Purpose |
 |------|---------|
-| `.goreleaser.yaml` | GoReleaser config |
+| `.goreleaser.yaml` | GoReleaser config (macOS only) |
 | `.github/workflows/release.yaml` | CI/CD pipeline |
+
+## Output
+
+Each release produces:
+- `memo_<version>_darwin_amd64.tar.gz` (Intel Mac)
+- `memo_<version>_darwin_arm64.tar.gz` (Apple Silicon)
+- `checksums.txt`
+- Homebrew Formula (pushed to tap repo)
