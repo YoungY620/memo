@@ -20,6 +20,7 @@ type Watcher struct {
 	mu                sync.Mutex
 	pending           map[string]struct{}
 	debounce, maxWait *time.Timer
+	sem               chan struct{} // capacity 1 semaphore for analysis guard
 }
 
 func NewWatcher(root string, ignore []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
@@ -35,6 +36,7 @@ func NewWatcher(root string, ignore []string, debounceMs, maxWaitMs int, onChang
 		onChange:       onChange,
 		watcher:        fsw,
 		pending:        make(map[string]struct{}),
+		sem:            make(chan struct{}, 1),
 	}
 	if err := w.watchAll(root); err != nil {
 		fsw.Close()
@@ -137,6 +139,16 @@ func (w *Watcher) add(file string) {
 }
 
 func (w *Watcher) Flush() {
+	// Non-blocking acquire: skip if analysis already running
+	select {
+	case w.sem <- struct{}{}:
+		// acquired
+	default:
+		logDebug("Analysis in progress, skipping flush (files remain in pending)")
+		return
+	}
+	defer func() { <-w.sem }()
+
 	w.mu.Lock()
 	if w.debounce != nil {
 		w.debounce.Stop()
