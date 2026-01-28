@@ -12,8 +12,8 @@
     },
     {
       "name": "watcher",
-      "description": "File system watcher using fsnotify. Watches directories recursively, ignores files matching configured patterns, implements debouncing (quiet period) and max-wait logic to batch file change events before triggering analysis.",
-      "interfaces": "NewWatcher(root, ignore, debounceMs, maxWaitMs, onChange) creates watcher. ScanAll() queues all existing files. Flush() triggers the onChange callback with pending files (used by once mode or timers). Run() starts event loop. Close() cleans up. Calls onChange callback with batched file list."
+      "description": "File system watcher using fsnotify. Watches directories recursively, ignores files matching configured patterns, implements debouncing (quiet period) and max-wait logic to batch file change events before triggering analysis. Uses a capacity-1 semaphore channel to prevent concurrent analysis when multiple Flush() calls overlap.",
+      "interfaces": "NewWatcher(root, ignore, debounceMs, maxWaitMs, onChange) creates watcher with semaphore guard. ScanAll() queues all existing files. Flush() uses non-blocking semaphore acquire to skip if analysis already running, otherwise triggers the onChange callback with pending files (used by once mode or timers). Run() starts event loop. Close() cleans up. Calls onChange callback with batched file list."
     },
     {
       "name": "analyser",

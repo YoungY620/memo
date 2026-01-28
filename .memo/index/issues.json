@@ -8,12 +8,12 @@
         {
           "file": "watcher.go",
           "keyword": "debounce",
-          "line": 131
+          "line": 133
         },
         {
           "file": "watcher.go",
           "keyword": "maxWait",
-          "line": 135
+          "line": 137
         }
       ]
     },
@@ -25,12 +25,12 @@
         {
           "file": "analyser.go",
           "keyword": "maxRetries",
-          "line": 201
+          "line": 204
         },
         {
           "file": "analyser.go",
           "keyword": "feedbackPrompt",
-          "line": 213
+          "line": 217
         }
       ]
     },
@@ -42,7 +42,7 @@
         {
           "file": "analyser.go",
           "keyword": "kimi defaults",
-          "line": 156
+          "line": 168
         },
         {
           "file": "config.yaml",
@@ -59,12 +59,12 @@
         {
           "file": "config.go",
           "keyword": "MergeGitignore",
-          "line": 121
+          "line": 119
         },
         {
           "file": "config.go",
           "keyword": "negation",
-          "line": 83
+          "line": 84
         }
       ]
     },
@@ -76,7 +76,7 @@
         {
           "file": "analyser.go",
           "keyword": "embed",
-          "line": 6
+          "line": 17
         }
       ]
     },
@@ -100,17 +100,12 @@
         {
           "file": "analyser.go",
           "keyword": "NewLineBuffer",
-          "line": 232
+          "line": 237
         },
         {
           "file": "log.go",
           "keyword": "LineBuffer",
-          "line": 54
-        },
-        {
-          "file": "spec/line-buffer-design.md",
-          "keyword": "LineBuffer",
-          "line": 44
+          "line": 88
         }
       ]
     },
@@ -122,7 +117,7 @@
         {
           "file": "watcher.go",
           "keyword": "ignored",
-          "line": 75
+          "line": 77
         }
       ]
     },
@@ -161,41 +156,24 @@
       ]
     },
     {
-      "tags": ["bug"],
-      "title": "Unused 'root' field in Watcher struct",
-      "description": "The Watcher struct declares 'root' as part of 'root, debounceMs, maxWaitMs int' but this field is never used. The actual root path is stored in the separate 'rootPath string' field. This appears to be leftover from earlier code and should be cleaned up.",
-      "locations": [
-        {
-          "file": "watcher.go",
-          "keyword": "root, debounceMs",
-          "line": 14
-        }
-      ]
-    },
-    {
       "tags": ["design-decision"],
       "title": "Once Mode for one-shot scanning via public Flush()",
-      "description": "The 'once mode' feature performs a single scan and analysis, then exits without entering the watch loop. This is useful for CI/CD pipelines or one-time documentation generation. The key design choice was to make flush() public as Flush(), allowing both normal mode (timer-triggered) and once mode (direct call from main.go after ScanAll) to reuse the same logic. The flow in once mode is: ScanAll() → pending → Flush() → onChange → exit. See spec/feature-once-mode.md for the architecture diagram.",
+      "description": "The 'once mode' feature performs a single scan and analysis, then exits without entering the watch loop. This is useful for CI/CD pipelines or one-time documentation generation. The key design choice was to make flush() public as Flush(), allowing both normal mode (timer-triggered) and once mode (direct call from main.go after ScanAll) to reuse the same logic. The flow in once mode is: ScanAll() → pending → Flush() → onChange → exit.",
       "locations": [
         {
           "file": "main.go",
           "keyword": "--once",
-          "line": 24
+          "line": 23
         },
         {
           "file": "main.go",
           "keyword": "onceFlag",
-          "line": 154
+          "line": 128
         },
         {
           "file": "watcher.go",
           "keyword": "Flush()",
-          "line": 139
-        },
-        {
-          "file": "spec/feature-once-mode.md",
-          "keyword": "Once mode",
-          "line": 9
+          "line": 141
         }
       ]
     },
@@ -208,11 +186,6 @@
           "file": "prompts/analyse.md",
           "keyword": "Create Todo List",
           "line": 5
-        },
-        {
-          "file": "spec/feature-thorough-analysis.md",
-          "keyword": "Thorough Analysis",
-          "line": 1
         }
       ]
     },
@@ -224,17 +197,12 @@
         {
           "file": "main.go",
           "keyword": "--mcp",
-          "line": 25
+          "line": 24
         },
         {
           "file": "main.go",
           "keyword": "mcp.Serve",
-          "line": 81
-        },
-        {
-          "file": "spec/feature-mcp-query.md",
-          "keyword": "MCP server mode",
-          "line": 11
+          "line": 51
         }
       ]
     },
@@ -273,14 +241,14 @@
         {
           "file": "mcp/server.go",
           "keyword": "tools()",
-          "line": 276
+          "line": 280
         }
       ]
     },
     {
       "tags": ["design-decision"],
-      "title": "MCP tool descriptions include mandatory whenToUse guidance for LLMs",
-      "description": "MCP tool descriptions embed a 'whenToUse' constant with a strong directive: LLMs should ALWAYS check project state via memo BEFORE doing anything - coding, debugging, refactoring, or answering questions. The guidance emphasizes that no matter what task, LLMs MUST first use memo to understand current project state before making any changes or decisions. Lists specific scenarios (before writing code, debugging, refactoring, answering questions) and explains why memo is better than reading files directly (pre-indexed, structured, efficient, accurate). This ensures LLMs have accurate, up-to-date context before starting any work.",
+      "title": "MCP tool descriptions include whenToUse guidance for LLMs",
+      "description": "MCP tool descriptions embed a 'whenToUse' constant explaining when LLMs should use memo tools FIRST - specifically for understanding, summarizing, exploring, or navigating codebases. Lists typical requests (summarize repo, show architecture, find issues) and explains why memo is better than reading files directly (pre-indexed, structured, efficient, contextual). This guides LLMs to use the indexed documentation before attempting to scan the filesystem.",
       "locations": [
         {
           "file": "mcp/server.go",
@@ -302,9 +270,9 @@
       ]
     },
     {
-      "tags": ["design-decision"],
-      "title": "MCP with Watcher mode via --mcp-with-watcher flag",
-      "description": "The --mcp-with-watcher flag runs MCP server + Watcher subprocess together. Architecture: (1) Default mode (no flag): Watcher only, (2) --mcp mode: MCP server only (requires existing index), (3) --mcp-with-watcher mode: spawns 'memo --path <workDir>' as subprocess with stdout/stderr set to nil, then runs MCP server on stdio. Signal handling (SIGINT/SIGTERM) kills the subprocess before exiting. The subprocess is also killed when the MCP server exits normally or with error.",
+      "tags": ["outdated-docs"],
+      "title": "Spec claims --mcp-with-watcher flag exists but it is not implemented",
+      "description": "The spec/feature-mcp-default.md and spec/plan-and-progress.md documents describe a --mcp-with-watcher flag that would spawn a watcher subprocess while running the MCP server. However, this flag is NOT implemented in main.go - only --mcp (MCP server only) exists. The spec shows architecture diagrams and TODO items marked as complete, but the actual code does not have this functionality. To use both watcher and MCP, users must run two separate processes.",
       "locations": [
         {
           "file": "spec/feature-mcp-default.md",
@@ -312,31 +280,31 @@
           "line": 3
         },
         {
-          "file": "main.go",
-          "keyword": "mcpWithWatcherFlag",
-          "line": 26
+          "file": "spec/plan-and-progress.md",
+          "keyword": "feature-mcp-default",
+          "line": 7
         },
         {
           "file": "main.go",
-          "keyword": "cmd.Process.Kill",
-          "line": 62
+          "keyword": "mcpFlag",
+          "line": 24
         }
       ]
     },
     {
-      "tags": ["todo", "design-decision"],
-      "title": "Add concurrent analysis guard with mutex in watcher",
-      "description": "When multiple Flush() calls overlap (e.g., Timer1 triggers Flush() which starts a long-running Analyse(), then Timer2 triggers another Flush() before Timer1 finishes), both may try to write to index files simultaneously causing conflicts. The solution is to add an 'analysing sync.Mutex' to the Watcher struct and lock/unlock it at the start/end of Flush(). This ensures only one analysis runs at a time - subsequent Flush() calls will block until the previous one completes.",
+      "tags": ["design-decision"],
+      "title": "Concurrent analysis guard prevents overlapping Flush() calls",
+      "description": "When multiple Flush() calls overlap (e.g., Timer1 triggers Flush() which starts a long-running Analyse(), then Timer2 triggers another Flush() before Timer1 finishes), both would try to write to index files simultaneously causing conflicts. The solution uses a capacity-1 channel 'sem chan struct{}' as a binary semaphore with non-blocking acquisition: if analysis is already running, the flush skips (files stay in pending) and logs a debug message. This ensures only one analysis runs at a time while allowing timer callbacks to return immediately. Accumulated files will be processed by the next timer-triggered flush after the current analysis completes.",
       "locations": [
         {
-          "file": "spec/feature-concurrent-analysis-guard.md",
-          "keyword": "Concurrent Analysis Guard",
-          "line": 1
+          "file": "watcher.go",
+          "keyword": "sem",
+          "line": 23
         },
         {
           "file": "watcher.go",
-          "keyword": "Flush()",
-          "line": 139
+          "keyword": "w.sem <-",
+          "line": 144
         }
       ]
     },
@@ -353,12 +321,10 @@
         {
           "file": "analyser.go",
           "keyword": "500 * time.Millisecond",
-          "line": 232
+          "line": 237
         }
       ]
     },
-
-
     {
       "tags": ["design-decision"],
       "title": "Local MCP config to prevent infinite recursion",
@@ -377,7 +343,7 @@
         {
           "file": "main.go",
           "keyword": "mcp.json",
-          "line": 203
+          "line": 177
         }
       ]
     },
@@ -396,7 +362,7 @@
     {
       "tags": ["design-decision", "optimization"],
       "title": "Batched analysis for large codebases to prevent context overflow",
-      "description": "IMPLEMENTED: When the codebase is very large (thousands of files), the file path list alone can exceed the LLM context window limit. The solution: (1) toRelativePaths() converts absolute paths to relative paths, reducing token usage, (2) splitIntoBatches() recursively splits files by directory when count exceeds threshold (default 100 files), (3) Analyse() processes batches sequentially, calling analyseBatch() for each, (4) analyseBatch() adds batch info to prompt ('Batch X of Y') so the AI knows context. The recursive splitting groups related files by directory and only splits further when a directory exceeds the threshold.",
+      "description": "When the codebase is very large (thousands of files), the file path list alone can exceed the LLM context window limit. The solution: (1) toRelativePaths() converts absolute paths to relative paths, reducing token usage, (2) splitIntoBatches() recursively splits files by directory when count exceeds threshold (default 100 files), (3) Analyse() processes batches sequentially, calling analyseBatch() for each, (4) analyseBatch() adds batch info to prompt ('Batch X of Y') so the AI knows context. The recursive splitting groups related files by directory and only splits further when a directory exceeds the threshold.",
       "locations": [
         {
           "file": "analyser.go",
@@ -417,18 +383,13 @@
           "file": "analyser.go",
           "keyword": "analyseBatch",
           "line": 146
-        },
-        {
-          "file": "spec/fix-large-codebase-context-overflow.md",
-          "keyword": "Context Overflow",
-          "line": 1
         }
       ]
     },
     {
       "tags": ["design-decision"],
       "title": "Watcher single instance lock and analysis status awareness",
-      "description": "Two-part solution for watcher reliability, now fully implemented: (1) Watcher Lock - flock on .memo/watcher.lock prevents multiple watchers on same directory, avoiding data corruption. lock.go provides TryLock(memoDir)/Unlock(f) using syscall.Flock with LOCK_EX|LOCK_NB. (2) Analysis Status - .memo/status.json signals ongoing analysis to MCP clients. status.go provides SetStatus()/GetStatus(). The analyser calls SetStatus('analyzing') before and SetStatus('idle') after analysis (via defer). MCP server checks status via getStatus() and adds Warning field to ToolCallResult responses when status is 'analyzing', including time elapsed since analysis started.",
+      "description": "Two-part solution for watcher reliability: (1) Watcher Lock - flock on .memo/watcher.lock prevents multiple watchers on same directory, avoiding data corruption. lock.go provides TryLock(memoDir)/Unlock(f) using syscall.Flock with LOCK_EX|LOCK_NB. (2) Analysis Status - .memo/status.json signals ongoing analysis to MCP clients. status.go provides SetStatus()/GetStatus(). The analyser calls SetStatus('analyzing') before and SetStatus('idle') after analysis (via defer). MCP server checks status via getStatus() and adds Warning field to ToolCallResult responses when status is 'analyzing', including time elapsed since analysis started.",
       "locations": [
         {
           "file": "lock.go",
@@ -448,17 +409,12 @@
         {
           "file": "mcp/server.go",
           "keyword": "getStatus",
-          "line": 239
+          "line": 240
         },
         {
           "file": "main.go",
           "keyword": "TryLock",
-          "line": 115
-        },
-        {
-          "file": "spec/feature-watcher-single-instance.md",
-          "keyword": "Watcher Single Instance",
-          "line": 1
+          "line": 85
         }
       ]
     },
@@ -476,33 +432,57 @@
           "file": "analyser.go",
           "keyword": "sessionID",
           "line": 41
-        },
-        {
-          "file": "spec/fix-session-id-pollution.md",
-          "keyword": "Session ID Pollution",
-          "line": 1
         }
       ]
     },
     {
       "tags": ["design-decision"],
       "title": "Delete before copy to prevent dyld zombie processes on macOS",
-      "description": "Fixed a macOS-specific issue where reinstalling memo binary while zombie processes hold references to the old file caused new processes to hang in dyld (Uninterruptible Sleep state). The fix ensures `rm -f` is called before copying/moving the new binary, creating a new inode that has no conflict with zombie process references. Implemented in both Makefile and install.sh. Note: Existing UE zombie processes can only be cleared by system reboot.",
+      "description": "Fixed a macOS-specific issue where reinstalling memo binary while zombie processes hold references to the old file caused new processes to hang in dyld (Uninterruptible Sleep state). The fix ensures `rm -f` is called before copying the new binary, creating a new inode that has no conflict with zombie process references. Implemented in Makefile. Note: Existing UE zombie processes can only be cleared by system reboot.",
       "locations": [
         {
           "file": "Makefile",
           "keyword": "rm -f",
           "line": 26
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "HistoryLogger for debugging MCP and watcher events",
+      "description": "Both MCP server and watcher write structured JSONL logs to .memo/.history. The mcp.HistoryLogger struct provides NewHistoryLogger(memoDir, source), Log(entry), LogRequest/LogResponse (with duration tracking), LogError/LogInfo/LogDebug. MCP server creates logger with source 'mcp', watcher uses source 'watcher' via InitHistoryLogger in log.go. Each entry has seq (auto-increment), ts (RFC3339Nano), src, type, and context-specific fields. This enables debugging without cluttering stdout.",
+      "locations": [
+        {
+          "file": "mcp/server.go",
+          "keyword": "HistoryLogger",
+          "line": 96
         },
         {
-          "file": "install.sh",
-          "keyword": "rm -f",
-          "line": 48
+          "file": "mcp/server.go",
+          "keyword": "NewHistoryLogger",
+          "line": 118
         },
         {
-          "file": "spec/fix-dyld-zombie-process.md",
-          "keyword": "dyld Zombie Process",
-          "line": 1
+          "file": "log.go",
+          "keyword": "InitHistoryLogger",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Auto-generated .memo/.gitignore for runtime file exclusion",
+      "description": "The initIndex() function creates .memo/.gitignore to exclude runtime files (watcher.lock, status.json, .history) from version control while allowing index/*.json files to be committed. This ensures users can check in their documentation index without accidentally including volatile files that would cause git conflicts.",
+      "locations": [
+        {
+          "file": "main.go",
+          "keyword": "gitignoreFile",
+          "line": 186
+        },
+        {
+          "file": "main.go",
+          "keyword": "gitignoreContent",
+          "line": 188
         }
       ]
     }
