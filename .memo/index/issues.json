@@ -485,6 +485,18 @@
           "line": 188
         }
       ]
+    },
+    {
+      "tags": ["todo", "design-decision"],
+      "title": "Periodic index rebuild with fresh sessions (Future Belongs to Future)",
+      "description": "Planned feature to prevent accumulated drift/hallucination in long-running sessions. Uses dual-index rotation (blue-green deployment style): (1) A Rotator component manages two Analyser instances, (2) Active analyser writes to index/, rebuild analyser writes to index-rebuild/, (3) After rebuild completes + stabilize period, atomic swap via rename, (4) Watcher sends changes to both analysers during rebuild. Additionally includes Randomized File Order: shuffle files and batch order at Analyse() entry to ensure each generation produces different understanding (LLMs are order-sensitive). Configuration: rebuild.enabled, rebuild.interval_minutes (default 30), rebuild.stabilize_minutes (default 5). Benefits: fresh session avoids context accumulation, full ScanAll catches incremental update gaps, randomized order adds diversity, seamless MCP reads. NOT YET IMPLEMENTED - all spec TODOs are unchecked.",
+      "locations": [
+        {
+          "file": "spec/feature-future-belongs-to-future.md",
+          "keyword": "Future Belongs to Future",
+          "line": 1
+        }
+      ]
     }
   ]
 }
