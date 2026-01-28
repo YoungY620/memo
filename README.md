@@ -4,15 +4,6 @@ AI-powered codebase memory for coding agents. Watches file changes and maintains
 
 ## Installation
 
-### Homebrew (macOS)
-
-```bash
-brew tap YoungY620/tap
-brew install memo
-```
-
-### From Source
-
 ```bash
 git clone https://github.com/YoungY620/memo.git
 cd memo
