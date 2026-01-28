@@ -1,0 +1,117 @@
+# GoReleaser configuration
+# Docs: https://goreleaser.com
+
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: memo
+    binary: memo
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.Version={{.Version}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+# Homebrew (macOS/Linux)
+brews:
+  - name: memo
+    repository:
+      owner: YoungY620
+      name: homebrew-tap
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/YoungY620/memo"
+    description: "AI-powered codebase memory for coding agents"
+    license: "MIT"
+    install: |
+      bin.install "memo"
+    test: |
+      system "#{bin}/memo", "--version"
+
+# Scoop (Windows - alternative to Chocolatey)
+scoops:
+  - name: memo
+    repository:
+      owner: YoungY620
+      name: scoop-bucket
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    homepage: "https://github.com/YoungY620/memo"
+    description: "AI-powered codebase memory for coding agents"
+    license: "MIT"
+
+# AUR (Arch Linux)
+aurs:
+  - name: memo-bin
+    homepage: "https://github.com/YoungY620/memo"
+    description: "AI-powered codebase memory for coding agents"
+    license: "MIT"
+    private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/memo-bin.git"
+    package: |
+      install -Dm755 memo "${pkgdir}/usr/bin/memo"
+
+# nFPM for deb/rpm/apk packages
+nfpms:
+  - id: packages
+    package_name: memo
+    vendor: YoungY620
+    homepage: "https://github.com/YoungY620/memo"
+    maintainer: "YoungY620 <youngyee620@qq.com>"
+    description: "AI-powered codebase memory for coding agents"
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/bin
+
+# Chocolatey (Windows)
+chocolateys:
+  - name: memo
+    owners: YoungY620
+    authors: YoungY620
+    project_url: "https://github.com/YoungY620/memo"
+    license_url: "https://github.com/YoungY620/memo/blob/main/LICENSE"
+    description: "AI-powered codebase memory for coding agents"
+    tags: "ai coding agent memo"
+    api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
+
+# GitHub Release
+release:
+  github:
+    owner: YoungY620
+    name: memo
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
