@@ -11,7 +11,7 @@ import (
 )
 
 type Watcher struct {
-	root, debounceMs, maxWaitMs int
+	debounceMs, maxWaitMs int
 	ignorePatterns              []string
 	onChange                    func([]string)
 	watcher                     *fsnotify.Watcher
