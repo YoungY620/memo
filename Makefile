@@ -1,4 +1,4 @@
-.PHONY: build build-all clean install
+.PHONY: build build-all clean install update
 
 BINARY=memo
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -26,3 +26,7 @@ install: build
 	rm -f $(HOME)/.local/bin/$(BINARY)
 	cp $(BINARY) $(HOME)/.local/bin/$(BINARY)
 	@echo "Installed $(BINARY) to $(HOME)/.local/bin"
+
+update:
+	git pull --rebase
+	$(MAKE) install
