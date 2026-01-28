@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -22,9 +21,8 @@ func main() {
 		configFlag         = flag.String("config", "config.yaml", "Path to config file")
 		versionFlag        = flag.Bool("version", false, "Print version and exit")
 		onceFlag           = flag.Bool("once", false, "Run once and exit (no watch mode)")
-		mcpFlag            = flag.Bool("mcp", false, "Run as MCP server (stdio)")
-		mcpWithWatcherFlag = flag.Bool("mcp-with-watcher", false, "Run MCP server with watcher subprocess")
-		logLevelFlag       = flag.String("log-level", "", "Log level: error, notice, info, debug")
+		mcpFlag      = flag.Bool("mcp", false, "Run as MCP server (stdio)")
+		logLevelFlag = flag.String("log-level", "", "Log level: error, notice, info, debug")
 	)
 	flag.Parse()
 
@@ -44,35 +42,7 @@ func main() {
 	}
 	workDir, _ = filepath.Abs(workDir)
 
-	// MCP with Watcher mode
-	if *mcpWithWatcherFlag {
-		// Spawn watcher subprocess
-		cmd := exec.Command(os.Args[0], "--path", workDir)
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		if err := cmd.Start(); err != nil {
-			log.Fatalf("[ERROR] Failed to start watcher subprocess: %v", err)
-		}
-
-		// Handle signals to kill subprocess
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		go func() {
-			<-sigChan
-			cmd.Process.Kill()
-			os.Exit(0)
-		}()
-
-		// Run MCP server
-		if err := mcp.Serve(workDir); err != nil {
-			cmd.Process.Kill()
-			log.Fatalf("[ERROR] MCP server error: %v", err)
-		}
-		cmd.Process.Kill()
-		return
-	}
-
-	// MCP server only mode
+	// MCP server mode
 	if *mcpFlag {
 		indexDir := filepath.Join(workDir, ".memo", "index")
 		if _, err := os.Stat(indexDir); os.IsNotExist(err) {
