@@ -55,18 +55,17 @@ Result: Overflow before analysis begins
                             │
                             ▼
                  ┌─────────────────────┐
-                 │ estimateTokens() >  │
-                 │ threshold?          │
+                 │ Group by directory  │
+                 │ (common path)       │
                  └─────────────────────┘
-                   │               │
-                  Yes              No
-                   │               │
-                   ▼               ▼
-        ┌──────────────────┐  ┌──────────────────┐
-        │ splitIntoBatches │  │ Single batch     │
-        └──────────────────┘  └──────────────────┘
-                   │
-                   ▼
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ Pack groups into    │
+                 │ batches (bin-pack)  │
+                 └─────────────────────┘
+                            │
+                            ▼
         ┌──────────────────┐
         │ For each batch:  │
         │ 1. Build prompt  │
@@ -74,6 +73,36 @@ Result: Overflow before analysis begins
         │ 3. Update index  │
         └──────────────────┘
 ```
+
+### Directory Grouping Strategy
+
+Files are grouped by their parent directory to keep related files together:
+
+```
+Input files:
+  src/api/handler.go
+  src/api/router.go
+  src/api/middleware.go
+  src/db/model.go
+  src/db/query.go
+  pkg/util/helper.go
+  main.go
+
+Grouped by directory:
+  "src/api"  → [handler.go, router.go, middleware.go]
+  "src/db"   → [model.go, query.go]
+  "pkg/util" → [helper.go]
+  "."        → [main.go]
+
+Batch packing (max 500 files, 50K chars):
+  Batch 1: src/api/* + src/db/* + pkg/util/* + main.go
+  (if fits within limits, otherwise split)
+```
+
+Benefits:
+- Related files analyzed together → better context understanding
+- Module boundaries preserved → more coherent index updates
+- Reduces redundant file reads across batches
 
 ## Files
 
@@ -116,22 +145,77 @@ Result: Overflow before analysis begins
 +     return rel
 + }
 
++ // groupByDirectory groups files by their parent directory
++ func groupByDirectory(files []string) map[string][]string {
++     groups := make(map[string][]string)
++     for _, f := range files {
++         dir := filepath.Dir(f)
++         groups[dir] = append(groups[dir], f)
++     }
++     return groups
++ }
+
++ // sortedDirKeys returns directory keys sorted by path depth (shallow first)
++ func sortedDirKeys(groups map[string][]string) []string {
++     keys := make([]string, 0, len(groups))
++     for k := range groups {
++         keys = append(keys, k)
++     }
++     sort.Slice(keys, func(i, j int) bool {
++         // Sort by depth first, then alphabetically
++         di := strings.Count(keys[i], string(filepath.Separator))
++         dj := strings.Count(keys[j], string(filepath.Separator))
++         if di != dj {
++             return di < dj
++         }
++         return keys[i] < keys[j]
++     })
++     return keys
++ }
+
 + func (a *Analyser) splitIntoBatches(files []string) [][]string {
++     // Group files by directory
++     groups := groupByDirectory(files)
++     dirs := sortedDirKeys(groups)
++     
 +     var batches [][]string
 +     var batch []string
 +     var chars int
 +     
-+     for _, f := range files {
-+         if len(batch) >= maxFilesPerBatch || chars+len(f) > maxCharsPerBatch {
-+             if len(batch) > 0 {
-+                 batches = append(batches, batch)
-+             }
++     for _, dir := range dirs {
++         dirFiles := groups[dir]
++         dirChars := 0
++         for _, f := range dirFiles {
++             dirChars += len(f) + 3  // +3 for "- " prefix and newline
++         }
++         
++         // If adding this directory exceeds limits, flush current batch
++         if len(batch) > 0 && (len(batch)+len(dirFiles) > maxFilesPerBatch || chars+dirChars > maxCharsPerBatch) {
++             batches = append(batches, batch)
 +             batch = nil
 +             chars = 0
 +         }
-+         batch = append(batch, f)
-+         chars += len(f) + 3
++         
++         // If directory itself exceeds limits, split it
++         if len(dirFiles) > maxFilesPerBatch || dirChars > maxCharsPerBatch {
++             for _, f := range dirFiles {
++                 if len(batch) >= maxFilesPerBatch || chars+len(f)+3 > maxCharsPerBatch {
++                     if len(batch) > 0 {
++                         batches = append(batches, batch)
++                     }
++                     batch = nil
++                     chars = 0
++                 }
++                 batch = append(batch, f)
++                 chars += len(f) + 3
++             }
++         } else {
++             // Add entire directory to current batch
++             batch = append(batch, dirFiles...)
++             chars += dirChars
++         }
 +     }
++     
 +     if len(batch) > 0 {
 +         batches = append(batches, batch)
 +     }
@@ -196,9 +280,12 @@ analysis:
 - [ ] Add `AnalysisBatch` struct
 - [ ] Implement `estimateTokens()` function
 - [ ] Implement `toRelativePaths()` function
-- [ ] Implement `splitIntoBatches()` function
+- [ ] Implement `groupByDirectory()` function
+- [ ] Implement `sortedDirKeys()` function
+- [ ] Implement `splitIntoBatches()` with directory grouping
 - [ ] Update `Analyse()` to use batching
 - [ ] Update `prompts/analyse.md` template
 - [ ] Add configuration options
 - [ ] Test with small repo (<100 files)
 - [ ] Test with large repo (>1000 files)
+- [ ] Test directory grouping preserves related files
