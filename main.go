@@ -88,6 +88,10 @@ func main() {
 	}
 	defer Unlock(lockFile)
 
+	// Initialize history logger for watcher
+	InitHistoryLogger(memoDir)
+	defer CloseHistoryLogger()
+
 	// Ensure status is idle on startup and exit
 	if err := SetStatus(memoDir, "idle"); err != nil {
 		logError("Failed to set initial status: %v", err)
@@ -116,7 +120,7 @@ func main() {
 	defer watcher.Close()
 
 	// Initial scan of all files
-	logInfo("Starting initial scan...")
+	logInfo("Watcher started, workDir=%s", workDir)
 	watcher.ScanAll()
 	logDebug("Initial scan completed")
 
@@ -184,6 +188,7 @@ func initIndex(indexDir string) error {
 		gitignoreContent := `# Runtime files - do not commit
 watcher.lock
 status.json
+.history
 `
 		logDebug("Creating %s", gitignoreFile)
 		if err := os.WriteFile(gitignoreFile, []byte(gitignoreContent), 0644); err != nil {

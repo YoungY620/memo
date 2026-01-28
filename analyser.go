@@ -192,10 +192,13 @@ func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, t
 	initialPrompt := contextPrompt + "\n\n" + analysePrompt + batchInfo + filesInfo
 
 	// Send initial prompt
-	logDebug("Sending initial analysis prompt")
+	logDebug("Batch %d/%d: sending initial prompt, files=%v", batchNum, totalBatches, files)
+	start := time.Now()
 	if err := a.runPrompt(ctx, session, initialPrompt); err != nil {
+		logError("Batch %d/%d: initial prompt failed: %v", batchNum, totalBatches, err)
 		return err
 	}
+	logDebug("Batch %d/%d: initial prompt completed, duration=%s", batchNum, totalBatches, time.Since(start))
 
 	// Validation loop
 	maxRetries := 5
@@ -207,15 +210,17 @@ func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, t
 			return nil
 		}
 
-		logError("Validation failed (attempt %d/%d): %s", i+1, maxRetries, FormatValidationErrors(result))
+		errMsg := FormatValidationErrors(result)
+		logError("Batch %d/%d: validation failed (attempt %d/%d): %s", batchNum, totalBatches, i+1, maxRetries, errMsg)
 
 		// Send feedback prompt
 		feedbackPrompt := loadPrompt("feedback")
 		errorInfo := "Validation errors:\n" + FormatValidationErrors(result)
 		fullFeedback := loadPrompt("context") + "\n\n" + feedbackPrompt + "\n\n" + errorInfo
 
-		logDebug("Sending feedback prompt")
+		logDebug("Batch %d/%d: sending feedback prompt (attempt %d)", batchNum, totalBatches, i+1)
 		if err := a.runPrompt(ctx, session, fullFeedback); err != nil {
+			logError("Batch %d/%d: feedback prompt failed: %v", batchNum, totalBatches, err)
 			return err
 		}
 	}
