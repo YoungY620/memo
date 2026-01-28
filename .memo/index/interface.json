@@ -32,12 +32,6 @@
     },
     {
       "type": "cli",
-      "name": "--mcp-with-watcher",
-      "params": "none (boolean flag)",
-      "description": "Runs MCP server with a watcher subprocess. Spawns 'memo --path <workDir>' as a background subprocess to maintain the index, then runs the MCP server on stdio. On exit (SIGINT/SIGTERM), the subprocess is automatically killed. Combines both watcher and MCP functionality in a single command."
-    },
-    {
-      "type": "cli",
       "name": "--log-level",
       "params": "string: error, notice, info, or debug",
       "description": "Overrides the log level from config file. Takes precedence over config.yaml log_level setting."
@@ -77,6 +71,18 @@
       "name": ".memo/status.json",
       "params": "JSON: {status: 'idle'|'analyzing', since?: ISO timestamp}",
       "description": "Analysis status file read by MCP server. When status is 'analyzing', MCP responses include a warning that data may be stale. The 'since' field indicates when analysis started."
+    },
+    {
+      "type": "filesystem",
+      "name": ".memo/.history",
+      "params": "JSONL file with log entries",
+      "description": "Debug log file containing MCP requests/responses and watcher events. Each line is a JSON object with seq, ts, src (mcp/watcher), type (request/response/info/debug/error), and relevant data fields."
+    },
+    {
+      "type": "filesystem",
+      "name": ".memo/.gitignore",
+      "params": "gitignore format listing runtime files",
+      "description": "Created by initIndex() to exclude runtime files (watcher.lock, status.json, .history) from version control while allowing index/*.json to be committed."
     },
     {
       "type": "rpc",
@@ -196,6 +202,12 @@
     },
     {
       "type": "callback",
+      "name": "mcp.NewHistoryLogger(memoDir, source string) (*HistoryLogger, error)",
+      "params": "memoDir: path to .memo directory, source: identifier (mcp or watcher)",
+      "description": "Creates a HistoryLogger that appends JSONL entries to .memo/.history file. Each entry has seq, ts, src, type, and context-specific fields."
+    },
+    {
+      "type": "callback",
       "name": "TryLock(memoDir string) (*os.File, error)",
       "params": "memoDir: path to .memo directory",
       "description": "Attempts to acquire exclusive flock on .memo/watcher.lock. Returns file handle if successful. Returns error 'another watcher is already running' if lock held by another process. Writes PID to lock file for debugging. Called by main at watcher/once mode startup."
@@ -217,6 +229,18 @@
       "name": "GetStatus(memoDir string) Status",
       "params": "memoDir: path to .memo directory",
       "description": "Reads status from .memo/status.json. Returns Status{Status: 'idle'} if file doesn't exist or is invalid JSON. Called by MCP server to check if analysis is in progress."
+    },
+    {
+      "type": "callback",
+      "name": "InitHistoryLogger(memoDir string)",
+      "params": "memoDir: path to .memo directory",
+      "description": "Initializes the global watcher history logger (historyLog) by creating a HistoryLogger with source 'watcher'. Called by main at startup. Log functions (logError, logInfo, etc.) write to this logger."
+    },
+    {
+      "type": "callback",
+      "name": "CloseHistoryLogger()",
+      "params": "none",
+      "description": "Closes the global watcher history logger. Called via defer in main after InitHistoryLogger."
     }
   ]
 }

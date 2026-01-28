@@ -257,25 +257,21 @@ const schemaDesc = `Schema:
 - [stories]: {stories: [{title, tags, content}]}
 - [issues]: {issues: [{tags, title, description, locations: [{file, keyword, line}]}]}`
 
-const whenToUse = `**When to use this tool:**
-Use memo tools FIRST when you need to understand, summarize, explore, or navigate a codebase. These tools provide pre-indexed documentation that is much faster and more accurate than scanning the filesystem yourself.
+const whenToUse = `**IMPORTANT: Always check project state via memo BEFORE doing anything.**
 
-Typical requests where you should use memo:
-- "Summarize/explain/describe this repo/project/codebase"
-- "What does this project do?" / "How does this project work?"
-- "Show me the architecture/structure/modules"
-- "What are the main components/modules?"
-- "How do modules relate to each other?"
-- "What interfaces/APIs does this project expose?"
-- "Find issues/problems/TODOs in the code"
-- "What are the design decisions?"
-- "Give me an overview/introduction"
+No matter what task you are working on - coding, debugging, refactoring, or answering questions - you MUST first use memo to understand the current project state. This ensures you have accurate, up-to-date context before making any changes or decisions.
 
-**Why use memo instead of reading files directly:**
+**When to use:**
+- BEFORE writing any code: understand the architecture and existing patterns
+- BEFORE debugging: check known issues and module relationships
+- BEFORE refactoring: understand interfaces and dependencies
+- BEFORE answering questions: get accurate project overview
+
+**Why memo instead of reading files directly:**
 1. Pre-indexed: AI has already analyzed the entire codebase
-2. Structured: Information is organized by architecture, interfaces, stories, issues
-3. Efficient: No need to read hundreds of files to understand the project
-4. Contextual: Includes relationships, design decisions, and known issues`
+2. Structured: Information organized by architecture, interfaces, stories, issues
+3. Efficient: No need to scan hundreds of files
+4. Accurate: Includes relationships, design decisions, and known issues`
 
 func (s *Server) tools() []Tool {
 	return []Tool{
