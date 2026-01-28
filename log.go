@@ -1,13 +1,19 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strings"
 	"time"
+
+	"github.com/YoungY620/memo/mcp"
 )
 
 // Log levels: error=0, notice=1, info=2, debug=3
 var logLevel = 2 // default: info
+
+// Global history logger for watcher logs
+var historyLog *mcp.HistoryLogger
 
 func SetLogLevel(level string) {
 	switch strings.ToLower(level) {
@@ -24,9 +30,28 @@ func SetLogLevel(level string) {
 	}
 }
 
+// InitHistoryLogger initializes the history logger for watcher
+func InitHistoryLogger(memoDir string) {
+	h, err := mcp.NewHistoryLogger(memoDir, "watcher")
+	if err == nil {
+		historyLog = h
+	}
+}
+
+// CloseHistoryLogger closes the history logger
+func CloseHistoryLogger() {
+	if historyLog != nil {
+		historyLog.Close()
+		historyLog = nil
+	}
+}
+
 func logError(format string, v ...any) {
 	if logLevel >= 0 {
 		log.Printf("[ERROR] "+format, v...)
+	}
+	if historyLog != nil {
+		historyLog.LogError(fmt.Sprintf(format, v...), nil)
 	}
 }
 
@@ -34,17 +59,26 @@ func logNotice(format string, v ...any) {
 	if logLevel >= 1 {
 		log.Printf("[NOTICE] "+format, v...)
 	}
+	if historyLog != nil {
+		historyLog.LogInfo(format, v...)
+	}
 }
 
 func logInfo(format string, v ...any) {
 	if logLevel >= 2 {
 		log.Printf("[INFO] "+format, v...)
 	}
+	if historyLog != nil {
+		historyLog.LogInfo(format, v...)
+	}
 }
 
 func logDebug(format string, v ...any) {
 	if logLevel >= 3 {
 		log.Printf("[DEBUG] "+format, v...)
+	}
+	if historyLog != nil {
+		historyLog.LogDebug(format, v...)
 	}
 }
 

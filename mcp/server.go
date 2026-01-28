@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -91,22 +92,147 @@ type ContentItem struct {
 	Text string `json:"text"`
 }
 
+// HistoryLogger logs events to .memo/.history for debugging
+type HistoryLogger struct {
+	file   *os.File
+	mu     sync.Mutex
+	seqNum int64
+	source string
+}
+
+// HistoryEntry represents a single log entry
+type HistoryEntry struct {
+	Seq       int64  `json:"seq"`
+	Timestamp string `json:"ts"`
+	Source    string `json:"src"`              // "mcp" or "watcher"
+	Type      string `json:"type"`             // "request", "response", "error", "info", "debug"
+	Method    string `json:"method,omitempty"` // for mcp requests
+	ID        any    `json:"id,omitempty"`     // for mcp request/response correlation
+	Params    any    `json:"params,omitempty"`
+	Result    any    `json:"result,omitempty"`
+	Error     any    `json:"error,omitempty"`
+	Duration  string `json:"duration,omitempty"`
+	Message   string `json:"msg,omitempty"`
+}
+
+// NewHistoryLogger creates a new history logger with given source
+func NewHistoryLogger(memoDir, source string) (*HistoryLogger, error) {
+	historyPath := filepath.Join(memoDir, ".history")
+	f, err := os.OpenFile(historyPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open history file: %w", err)
+	}
+	return &HistoryLogger{file: f, source: source}, nil
+}
+
+// Log writes an entry to the history file
+func (h *HistoryLogger) Log(entry HistoryEntry) {
+	if h == nil || h.file == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.seqNum++
+	entry.Seq = h.seqNum
+	entry.Timestamp = time.Now().Format(time.RFC3339Nano)
+	entry.Source = h.source
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return
+	}
+	h.file.Write(data)
+	h.file.Write([]byte("\n"))
+}
+
+// LogRequest logs an incoming MCP request
+func (h *HistoryLogger) LogRequest(req *Request) {
+	var params any
+	if len(req.Params) > 0 {
+		json.Unmarshal(req.Params, &params)
+	}
+	h.Log(HistoryEntry{
+		Type:   "request",
+		Method: req.Method,
+		ID:     req.ID,
+		Params: params,
+	})
+}
+
+// LogResponse logs an outgoing MCP response
+func (h *HistoryLogger) LogResponse(resp *Response, duration time.Duration) {
+	entry := HistoryEntry{
+		Type:     "response",
+		ID:       resp.ID,
+		Duration: duration.String(),
+	}
+	if resp.Error != nil {
+		entry.Error = resp.Error
+	} else {
+		entry.Result = resp.Result
+	}
+	h.Log(entry)
+}
+
+// LogError logs an error
+func (h *HistoryLogger) LogError(message string, err error) {
+	entry := HistoryEntry{Type: "error", Message: message}
+	if err != nil {
+		entry.Error = err.Error()
+	}
+	h.Log(entry)
+}
+
+// LogInfo logs an informational message
+func (h *HistoryLogger) LogInfo(format string, v ...any) {
+	msg := format
+	if len(v) > 0 {
+		msg = fmt.Sprintf(format, v...)
+	}
+	h.Log(HistoryEntry{Type: "info", Message: msg})
+}
+
+// LogDebug logs a debug message
+func (h *HistoryLogger) LogDebug(format string, v ...any) {
+	msg := format
+	if len(v) > 0 {
+		msg = fmt.Sprintf(format, v...)
+	}
+	h.Log(HistoryEntry{Type: "debug", Message: msg})
+}
+
+// Close closes the history file
+func (h *HistoryLogger) Close() error {
+	if h != nil && h.file != nil {
+		return h.file.Close()
+	}
+	return nil
+}
+
 // Server is the MCP server
 type Server struct {
 	indexDir string
 	memoDir  string
 	reader   *bufio.Reader
 	writer   io.Writer
+	history  *HistoryLogger
 }
 
 // NewServer creates a new MCP server
 func NewServer(workDir string) *Server {
 	memoDir := filepath.Join(workDir, ".memo")
+	// Ensure .memo directory exists
+	os.MkdirAll(memoDir, 0755)
+
+	history, _ := NewHistoryLogger(memoDir, "mcp") // ignore error, logging is optional
+
 	return &Server{
 		indexDir: filepath.Join(memoDir, "index"),
 		memoDir:  memoDir,
 		reader:   bufio.NewReader(os.Stdin),
 		writer:   os.Stdout,
+		history:  history,
 	}
 }
 
@@ -180,23 +306,47 @@ func (s *Server) tools() []Tool {
 
 // Run starts the MCP server
 func (s *Server) Run() error {
+	if s.history != nil {
+		s.history.LogInfo("MCP server started")
+		defer s.history.Close()
+		defer s.history.LogInfo("MCP server stopped")
+	}
+
 	for {
 		line, err := s.reader.ReadBytes('\n')
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
+			if s.history != nil {
+				s.history.LogError("read error", err)
+			}
 			return err
 		}
 
 		var req Request
 		if err := json.Unmarshal(line, &req); err != nil {
+			if s.history != nil {
+				s.history.LogError("parse error", err)
+			}
 			s.sendError(nil, -32700, "Parse error")
 			continue
 		}
 
+		// Log request
+		if s.history != nil {
+			s.history.LogRequest(&req)
+		}
+
+		start := time.Now()
 		resp := s.handleRequest(&req)
+		duration := time.Since(start)
+
 		if resp != nil {
+			// Log response
+			if s.history != nil {
+				s.history.LogResponse(resp, duration)
+			}
 			s.sendResponse(resp)
 		}
 	}
