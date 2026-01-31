@@ -18,13 +18,27 @@ import (
 var Version = "dev"
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, `Usage: memo [flags]
+
+Memo maintains AI-readable documentation (.memo/index) for your codebase.
+
+Modes:
+  (default)   Watch mode - monitors file changes and updates index continuously
+  --once      Scan mode  - analyzes all files once, updates index, then exits
+  --mcp       Query mode - starts MCP server for AI agents to query the index
+
+Flags:
+`)
+		flag.PrintDefaults()
+	}
 	var (
-		pathFlag     = flag.String("path", "", "Path to watch (default: current directory)")
-		configFlag   = flag.String("config", "config.yaml", "Path to config file")
-		versionFlag  = flag.Bool("version", false, "Print version and exit")
-		onceFlag     = flag.Bool("once", false, "Run once and exit (no watch mode)")
-		mcpFlag      = flag.Bool("mcp", false, "Run as MCP server (stdio)")
-		logLevelFlag = flag.String("log-level", "", "Log level: error, notice, info, debug")
+		pathFlag     = flag.String("path", "", "target directory (default: current dir)")
+		configFlag   = flag.String("config", "config.yaml", "config file path")
+		versionFlag  = flag.Bool("version", false, "print version")
+		onceFlag     = flag.Bool("once", false, "scan all files once and exit")
+		mcpFlag      = flag.Bool("mcp", false, "run as MCP server (requires existing index)")
+		logLevelFlag = flag.String("log-level", "", "log level: error/notice/info/debug")
 	)
 	flag.Parse()
 

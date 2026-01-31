@@ -34,13 +34,32 @@ Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instanc
 
 ## Usage
 
+Memo has three modes:
+
+### Watch Mode (default)
+Continuously monitors file changes and updates `.memo/index`:
 ```bash
 memo                        # watch current directory
 memo --path /path/to/repo   # watch specific directory
-memo --config config.yaml   # custom config
-memo --once                 # analyze once and exit
-memo --log-level debug      # set log level (error/notice/info/debug)
-memo --mcp                  # start a mcp server (stdio)
+```
+
+### Scan Mode (--once)
+Analyzes all files once, updates index, then exits. Useful for CI or initial setup:
+```bash
+memo --once
+memo --once --path /path/to/repo
+```
+
+### Query Mode (--mcp)
+Starts an MCP server for AI agents to query the index. Requires an existing `.memo/index` (run watch/scan first):
+```bash
+memo --mcp --path /path/to/repo
+```
+
+### Other Options
+```bash
+memo --config config.yaml   # custom config file
+memo --log-level debug      # log level: error/notice/info/debug
 memo --version
 ```
 
@@ -61,42 +80,37 @@ watch:
   max_wait_ms: 300000  # 5min max wait
 ```
 
-## MCP Integration (Kimi CLI)
+## MCP Integration
 
-Memo provides two MCP tools for Kimi CLI:
+Memo exposes `.memo/index` to AI agents via MCP protocol:
 
-- `memo_list_keys` — List keys at a JSON path in `.memo/index`
-- `memo_get_value` — Get value at a JSON path in `.memo/index`
+- `memo_list_keys` — List keys at a JSON path
+- `memo_get_value` — Get value at a JSON path
 
-### Setup
+### Typical Workflow
 
-Add to `~/.kimi/mcp.json`:
+1. **Start watcher** (keeps index updated as you code):
+   ```bash
+   memo --path /path/to/project
+   ```
 
-```json
-{
-  "mcpServers": {
-    "memo": {
-      "command": "memo",
-      "args": ["--mcp"]
-    }
-  }
-}
-```
+2. **Configure AI agent** to use memo MCP server. Example for Kimi CLI (`~/.kimi/mcp.json`):
+   ```json
+   {
+     "mcpServers": {
+       "memo": {
+         "command": "memo",
+         "args": ["--mcp", "--path", "/path/to/project"]
+       }
+     }
+   }
+   ```
 
-Run watcher in a separate terminal to see real-time output:
-
-```bash
-memo --path /path/to/project
-```
-
-### Verify
-
-```bash
-kimi
-> Summarize this repo
-```
-
-Kimi will use memo tools to read `.memo/index` and provide a summary.
+3. **Query via agent**:
+   ```bash
+   kimi
+   > Summarize this repo
+   ```
 
 ## Output
 
