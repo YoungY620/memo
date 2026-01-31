@@ -70,13 +70,51 @@ test-bench:
 
 # ============== Linting ==============
 
-lint:
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run ./...; \
-	else \
-		echo "golangci-lint not installed, running go vet instead"; \
-		go vet ./...; \
+# Install golangci-lint if not present
+lint-install:
+	@if ! command -v golangci-lint >/dev/null 2>&1; then \
+		echo "Installing golangci-lint..."; \
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
 	fi
+
+# Run all linters (golangci-lint includes errcheck, staticcheck, etc.)
+lint: lint-install
+	golangci-lint run --timeout=5m ./...
+
+# Quick lint - only changed files (faster for development)
+lint-fast: lint-install
+	golangci-lint run --timeout=2m --new ./...
+
+# Run go vet only (built-in, fast)
+vet:
+	go vet ./...
+
+# Run errcheck specifically (catches unchecked error returns)
+errcheck: lint-install
+	golangci-lint run --enable=errcheck --disable-all ./...
+
+# Run staticcheck (comprehensive static analysis)
+staticcheck: lint-install
+	golangci-lint run --enable=staticcheck --disable-all ./...
+
+# ============== Pre-commit Checks ==============
+
+# Run all checks before committing (recommended: make pre-commit)
+pre-commit: fmt vet lint test-unit
+	@echo ""
+	@echo "✅ All pre-commit checks passed!"
+	@echo ""
+
+# Format code
+fmt:
+	go fmt ./...
+	@echo "Code formatted"
+
+# Quick check (faster, for rapid iteration)
+check: fmt vet lint-fast test-unit
+	@echo ""
+	@echo "✅ Quick checks passed!"
+	@echo ""
 
 # ============== CI Helpers ==============
 
@@ -89,3 +127,32 @@ ci-build-check:
 	GOOS=darwin  GOARCH=amd64 go build $(LDFLAGS) -o /dev/null .
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o /dev/null .
 	@echo "Build check passed for all platforms"
+
+# ============== Help ==============
+
+help:
+	@echo "Available targets:"
+	@echo ""
+	@echo "  Build:"
+	@echo "    make build        - Build for current platform"
+	@echo "    make build-all    - Build for all platforms"
+	@echo "    make install      - Build and install to ~/.local/bin"
+	@echo "    make clean        - Remove build artifacts"
+	@echo ""
+	@echo "  Test:"
+	@echo "    make test         - Run all tests"
+	@echo "    make test-unit    - Run unit tests only"
+	@echo "    make test-bench   - Run benchmarks"
+	@echo "    make test-coverage - Generate coverage report"
+	@echo ""
+	@echo "  Lint:"
+	@echo "    make lint         - Run all linters (golangci-lint)"
+	@echo "    make lint-fast    - Lint only changed files"
+	@echo "    make vet          - Run go vet"
+	@echo "    make errcheck     - Check for unchecked errors"
+	@echo "    make fmt          - Format code"
+	@echo ""
+	@echo "  Pre-commit:"
+	@echo "    make pre-commit   - Run all checks before committing"
+	@echo "    make check        - Quick checks (faster)"
+	@echo ""
