@@ -10,7 +10,7 @@ Prevent context window overflow when analyzing large codebases by using relative
 
 | Issue | Impact |
 |-------|--------|
-| Absolute paths consume tokens | `......` repeated N times |
+| Absolute paths consume tokens | `/path/to/project/very-long-path/...` repeated N times |
 | All files sent in one batch | 15,000 files × 80 chars = 1.2MB (exceeds 128K context) |
 | No overflow detection | Analysis fails silently or produces incomplete results |
 

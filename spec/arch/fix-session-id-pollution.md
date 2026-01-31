@@ -143,7 +143,7 @@ Prevent memo from creating multiple Kimi sessions by using a deterministic sessi
 ```
 WorkDir: /path/to/your/project
 Session: memo-aef71e24
-Path:    ~/.kimi/sessions/f4b5685280e16d1e027118eee3021c23/memo-aef71e24/
+Path:    ~/.kimi/sessions/<workdir-hash>/memo-aef71e24/
 ```
 
 ## TODO

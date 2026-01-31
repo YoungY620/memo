@@ -107,7 +107,7 @@ memo    78829  txt   REG   8087650 ~/.local/bin/memo
 # Different inodes for local vs global binary
 $ ls -lai ./memo ~/.local/bin/memo
 8139179 ./memo                        # Local build
-8087650 ~/.local/bin/memo  # Global install
+8087650 ~/.local/bin/memo             # Global install
 
 # Copying to fresh location works fine
 $ cp ./memo /tmp/memo_test
