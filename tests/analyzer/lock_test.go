@@ -3,6 +3,7 @@ package analyzer_test
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -25,13 +26,12 @@ func TestTryLock(t *testing.T) {
 	// First lock should succeed
 	lock1, err := analyzer.TryLock(memoDir)
 	require.NoError(t, err, "First lock should succeed")
-	defer analyzer.Unlock(lock1)
 
-	// Verify lock file exists
+	// Verify lock file exists (use Stat instead of ReadFile for Windows compatibility)
 	lockPath := filepath.Join(memoDir, "watcher.lock")
-	data, err := os.ReadFile(lockPath)
+	info, err := os.Stat(lockPath)
 	require.NoError(t, err, "Lock file should exist")
-	assert.NotEmpty(t, data, "Lock file should contain PID")
+	assert.True(t, info.Size() > 0, "Lock file should contain PID")
 
 	// Second lock should fail
 	lock2, err := analyzer.TryLock(memoDir)
@@ -66,6 +66,11 @@ func TestTryLock_DirNotExist(t *testing.T) {
 }
 
 func TestTryLock_PIDWritten(t *testing.T) {
+	// Skip reading locked file content on Windows (file is exclusively locked)
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping PID verification on Windows due to exclusive file locking")
+	}
+
 	tmpDir := t.TempDir()
 	memoDir := filepath.Join(tmpDir, ".memo")
 	require.NoError(t, os.MkdirAll(memoDir, 0755))
