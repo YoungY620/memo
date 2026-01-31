@@ -25,7 +25,7 @@ Inspired by traditional code indexing, Memo maintains a semantic index specifica
 
 Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instances, limited by time):
 
-![Performance Analysis](performance_analysis_final.png)
+[performance_analysis_final.png](performance_analysis_final.png)
 
 **Key findings:**
 - **4× pass rate improvement** (4.3% → 17.4%)
