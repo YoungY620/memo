@@ -36,7 +36,7 @@ jobs:
   test:
     name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    needs: lint
+    # 与 lint 并行执行
     strategy:
       fail-fast: false
       matrix:
@@ -73,7 +73,7 @@ jobs:
   build:
     name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    needs: test
+    needs: [lint, test]  # 等待 lint 和 test 都完成
     strategy:
       fail-fast: false
       matrix:
