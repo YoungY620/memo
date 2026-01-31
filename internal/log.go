@@ -32,6 +32,9 @@ func SetLogLevel(level string) {
 
 // InitHistoryLogger initializes the history logger
 func InitHistoryLogger(memoDir, source string) {
+	// Close existing logger first to avoid file handle leaks
+	CloseHistoryLogger()
+
 	h, err := NewHistoryLogger(memoDir, source)
 	if err == nil {
 		historyLog = h
