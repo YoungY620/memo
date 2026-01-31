@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/YoungY620/memo/internal"
 	"github.com/YoungY620/memo/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,6 +42,9 @@ func newTestServer(t *testing.T) (*testServer, string) {
 	for name, content := range files {
 		os.WriteFile(filepath.Join(indexDir, name), []byte(content), 0644)
 	}
+
+	// Ensure history logger is closed after test to release file handles (Windows)
+	t.Cleanup(internal.CloseHistoryLogger)
 
 	return &testServer{
 		input:  new(bytes.Buffer),
@@ -208,6 +212,8 @@ func TestToolCallResult_WithWarning(t *testing.T) {
 func TestServe_NonExistentDir(t *testing.T) {
 	// Serve should work even with new directory (it creates .memo)
 	tmpDir := t.TempDir()
+	t.Cleanup(internal.CloseHistoryLogger)
+
 	server := mcp.NewServer(tmpDir)
 
 	if server == nil {
