@@ -5,8 +5,27 @@ on:
     branches: ['**']
     tags-ignore:
       - 'v*'
+    paths:
+      # Go code
+      - '**/*.go'
+      # Dependencies
+      - 'go.mod'
+      - 'go.sum'
+      # Embedded content
+      - 'analyzer/prompts/**'
+      # Build config
+      - 'Makefile'
+      # This workflow
+      - '.github/workflows/test.yml'
   pull_request:
     branches: [main, master]
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'analyzer/prompts/**'
+      - 'Makefile'
+      - '.github/workflows/test.yml'
   workflow_dispatch:
 
 jobs:
