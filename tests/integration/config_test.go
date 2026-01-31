@@ -16,7 +16,7 @@ func TestConfigDefaults(t *testing.T) {
 
 	// Create a minimal config file
 	configPath := filepath.Join(tmpDir, "config.yaml")
-	os.WriteFile(configPath, []byte(""), 0644)
+	_ = os.WriteFile(configPath, []byte(""), 0644)
 
 	// We can't directly call LoadConfig from here since it's in main package
 	// This test is more of a placeholder for integration testing
@@ -129,7 +129,7 @@ func TestIndexFileFormats(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	indexDir := filepath.Join(tmpDir, ".memo", "index")
-	os.MkdirAll(indexDir, 0755)
+	_ = os.MkdirAll(indexDir, 0755)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

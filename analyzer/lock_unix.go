@@ -29,10 +29,10 @@ func TryLock(memoDir string) (*os.File, error) {
 	}
 
 	// Write PID to lock file (for debugging)
-	f.Truncate(0)
-	f.Seek(0, 0)
+	_ = f.Truncate(0)
+	_, _ = f.Seek(0, 0)
 	fmt.Fprintf(f, "%d\n", os.Getpid())
-	f.Sync()
+	_ = f.Sync()
 
 	return f, nil
 }
@@ -40,7 +40,7 @@ func TryLock(memoDir string) (*os.File, error) {
 // Unlock releases the lock and closes the file
 func Unlock(f *os.File) {
 	if f != nil {
-		syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 		f.Close()
 	}
 }

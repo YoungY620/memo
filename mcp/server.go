@@ -106,7 +106,7 @@ type Server struct {
 func NewServer(workDir string) *Server {
 	memoDir := filepath.Join(workDir, ".memo")
 	// Ensure .memo directory exists
-	os.MkdirAll(memoDir, 0755)
+	_ = os.MkdirAll(memoDir, 0755)
 
 	h, _ := internal.NewHistoryLogger(memoDir, "mcp") // ignore error, logging is optional
 
@@ -126,7 +126,7 @@ func (s *Server) logRequest(req *Request) {
 	}
 	var params any
 	if len(req.Params) > 0 {
-		json.Unmarshal(req.Params, &params)
+		_ = json.Unmarshal(req.Params, &params)
 	}
 	s.history.Log(internal.HistoryEntry{
 		Type:   "request",

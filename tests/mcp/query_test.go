@@ -311,7 +311,7 @@ func BenchmarkParsePath(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, p := range paths {
-			mcp.ParsePath(p)
+			_, _, _ = mcp.ParsePath(p)
 		}
 	}
 }

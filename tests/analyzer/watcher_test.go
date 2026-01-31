@@ -123,7 +123,7 @@ func TestWatcher_Debounce(t *testing.T) {
 
 	// Create test files
 	for i := 0; i < 5; i++ {
-		os.WriteFile(filepath.Join(tmpDir, "file"+string(rune('0'+i))+".txt"), []byte("content"), 0644)
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "file"+string(rune('0'+i))+".txt"), []byte("content"), 0644))
 	}
 
 	var mu sync.Mutex
@@ -158,7 +158,7 @@ func TestWatcher_MaxWait(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create initial file
-	os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("content"), 0644)
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("content"), 0644))
 
 	var mu sync.Mutex
 	var callCount int
@@ -190,7 +190,7 @@ func TestWatcher_ConcurrentGuard(t *testing.T) {
 
 	// Create test files
 	for i := 0; i < 3; i++ {
-		os.WriteFile(filepath.Join(tmpDir, "file"+string(rune('0'+i))+".txt"), []byte("content"), 0644)
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "file"+string(rune('0'+i))+".txt"), []byte("content"), 0644))
 	}
 
 	var concurrentCount int32
@@ -243,7 +243,7 @@ func TestWatcher_NewDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create initial file
-	os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("content"), 0644)
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("content"), 0644))
 
 	var mu sync.Mutex
 	var receivedFiles []string
@@ -258,7 +258,7 @@ func TestWatcher_NewDirectory(t *testing.T) {
 	defer watcher.Close()
 
 	// Start watcher in background
-	go watcher.Run()
+	go func() { _ = watcher.Run() }()
 
 	// Wait a bit for watcher to start
 	time.Sleep(50 * time.Millisecond)
@@ -310,7 +310,7 @@ func TestWatcher_FileEvents(t *testing.T) {
 	defer watcher.Close()
 
 	// Start watcher
-	go watcher.Run()
+	go func() { _ = watcher.Run() }()
 	time.Sleep(50 * time.Millisecond)
 
 	// Test Write event

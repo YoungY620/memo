@@ -21,7 +21,7 @@ func setupMCPTestEnv(t *testing.T) (string, string) {
 	// Create test directory with index
 	tmpDir := t.TempDir()
 	indexDir := filepath.Join(tmpDir, ".memo", "index")
-	os.MkdirAll(indexDir, 0755)
+	_ = os.MkdirAll(indexDir, 0755)
 
 	files := map[string]string{
 		"arch.json":      `{"modules": [{"name": "test", "description": "test module", "interfaces": "none"}], "relationships": "test"}`,
@@ -31,7 +31,7 @@ func setupMCPTestEnv(t *testing.T) (string, string) {
 	}
 
 	for name, content := range files {
-		os.WriteFile(filepath.Join(indexDir, name), []byte(content), 0644)
+		_ = os.WriteFile(filepath.Join(indexDir, name), []byte(content), 0644)
 	}
 
 	return binary, tmpDir
@@ -54,11 +54,11 @@ func TestMCPServer_Initialize(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	defer cmd.Process.Kill()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	// Send initialize request
 	initReq := `{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}` + "\n"
-	stdin.Write([]byte(initReq))
+	_, _ = stdin.Write([]byte(initReq))
 
 	// Read response
 	reader := bufio.NewReader(stdout)
@@ -94,17 +94,17 @@ func TestMCPServer_ToolsList(t *testing.T) {
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
-	cmd.Start()
-	defer cmd.Process.Kill()
+	_ = cmd.Start()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	// Initialize first
-	stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}` + "\n"))
+	_, _ = stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}` + "\n"))
 
 	reader := bufio.NewReader(stdout)
-	reader.ReadBytes('\n') // Skip init response
+	_, _ = reader.ReadBytes('\n') // Skip init response
 
 	// Request tools list
-	stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}` + "\n"))
+	_, _ = stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}` + "\n"))
 
 	line, err := reader.ReadBytes('\n')
 	if err != nil {
@@ -112,7 +112,7 @@ func TestMCPServer_ToolsList(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.Unmarshal(line, &resp)
+	_ = json.Unmarshal(line, &resp)
 
 	result := resp["result"].(map[string]any)
 	tools := result["tools"].([]any)
@@ -143,23 +143,23 @@ func TestMCPServer_ToolCall(t *testing.T) {
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
-	cmd.Start()
-	defer cmd.Process.Kill()
+	_ = cmd.Start()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	reader := bufio.NewReader(stdout)
 
 	// Initialize
-	stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}` + "\n"))
-	reader.ReadBytes('\n')
+	_, _ = stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}` + "\n"))
+	_, _ = reader.ReadBytes('\n')
 
 	// Call memo_list_keys
 	callReq := `{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "memo_list_keys", "arguments": {"path": "[arch]"}}}` + "\n"
-	stdin.Write([]byte(callReq))
+	_, _ = stdin.Write([]byte(callReq))
 
 	line, _ := reader.ReadBytes('\n')
 
 	var resp map[string]any
-	json.Unmarshal(line, &resp)
+	_ = json.Unmarshal(line, &resp)
 
 	result := resp["result"].(map[string]any)
 	content := result["content"].([]any)
@@ -173,7 +173,7 @@ func TestMCPServer_ToolCall(t *testing.T) {
 	text := contentItem["text"].(string)
 
 	var listResult map[string]any
-	json.Unmarshal([]byte(text), &listResult)
+	_ = json.Unmarshal([]byte(text), &listResult)
 
 	if listResult["type"] != "dict" {
 		t.Errorf("Expected type 'dict', got: %v", listResult["type"])
@@ -187,23 +187,23 @@ func TestMCPServer_GetValue(t *testing.T) {
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
-	cmd.Start()
-	defer cmd.Process.Kill()
+	_ = cmd.Start()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	reader := bufio.NewReader(stdout)
 
 	// Initialize
-	stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}` + "\n"))
-	reader.ReadBytes('\n')
+	_, _ = stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}` + "\n"))
+	_, _ = reader.ReadBytes('\n')
 
 	// Get value
 	callReq := `{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "memo_get_value", "arguments": {"path": "[arch][modules][0][name]"}}}` + "\n"
-	stdin.Write([]byte(callReq))
+	_, _ = stdin.Write([]byte(callReq))
 
 	line, _ := reader.ReadBytes('\n')
 
 	var resp map[string]any
-	json.Unmarshal(line, &resp)
+	_ = json.Unmarshal(line, &resp)
 
 	result := resp["result"].(map[string]any)
 	content := result["content"].([]any)
@@ -211,7 +211,7 @@ func TestMCPServer_GetValue(t *testing.T) {
 	text := contentItem["text"].(string)
 
 	var getValue map[string]any
-	json.Unmarshal([]byte(text), &getValue)
+	_ = json.Unmarshal([]byte(text), &getValue)
 
 	if getValue["value"] != `"test"` {
 		t.Errorf("Expected value '\"test\"', got: %v", getValue["value"])
@@ -225,18 +225,18 @@ func TestMCPServer_InvalidMethod(t *testing.T) {
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
-	cmd.Start()
-	defer cmd.Process.Kill()
+	_ = cmd.Start()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	reader := bufio.NewReader(stdout)
 
 	// Send invalid method
-	stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 1, "method": "invalid_method", "params": {}}` + "\n"))
+	_, _ = stdin.Write([]byte(`{"jsonrpc": "2.0", "id": 1, "method": "invalid_method", "params": {}}` + "\n"))
 
 	line, _ := reader.ReadBytes('\n')
 
 	var resp map[string]any
-	json.Unmarshal(line, &resp)
+	_ = json.Unmarshal(line, &resp)
 
 	if resp["error"] == nil {
 		t.Error("Expected error for invalid method")
@@ -255,7 +255,7 @@ func TestMCPServer_Shutdown(t *testing.T) {
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
-	cmd.Start()
+	_ = cmd.Start()
 
 	// Close stdin to trigger EOF
 	stdin.Close()
@@ -263,7 +263,7 @@ func TestMCPServer_Shutdown(t *testing.T) {
 	// Server should exit gracefully
 	done := make(chan error)
 	go func() {
-		io.ReadAll(stdout)
+		_, _ = io.ReadAll(stdout)
 		done <- cmd.Wait()
 	}()
 
@@ -273,7 +273,7 @@ func TestMCPServer_Shutdown(t *testing.T) {
 			t.Logf("Server exited with: %v (expected)", err)
 		}
 	case <-time.After(5 * time.Second):
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		t.Error("Server did not exit after stdin closed")
 	}
 }
@@ -285,18 +285,18 @@ func TestMCPServer_InvalidJSON(t *testing.T) {
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
-	cmd.Start()
-	defer cmd.Process.Kill()
+	_ = cmd.Start()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	reader := bufio.NewReader(stdout)
 
 	// Send invalid JSON
-	stdin.Write([]byte(`{invalid json}` + "\n"))
+	_, _ = stdin.Write([]byte(`{invalid json}` + "\n"))
 
 	line, _ := reader.ReadBytes('\n')
 
 	var resp map[string]any
-	json.Unmarshal(line, &resp)
+	_ = json.Unmarshal(line, &resp)
 
 	if resp["error"] == nil {
 		t.Error("Expected error for invalid JSON")

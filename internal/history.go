@@ -59,8 +59,8 @@ func (h *HistoryLogger) Log(entry HistoryEntry) {
 	if err != nil {
 		return
 	}
-	h.file.Write(data)
-	h.file.Write([]byte("\n"))
+	_, _ = h.file.Write(data)
+	_, _ = h.file.Write([]byte("\n"))
 }
 
 // LogError logs an error

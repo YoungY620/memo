@@ -45,13 +45,13 @@ func TestGetStatus(t *testing.T) {
 	assert.Equal(t, "idle", status.Status, "Default status should be idle")
 
 	// Test getting status after setting
-	analyzer.SetStatus(memoDir, "analyzing")
+	require.NoError(t, analyzer.SetStatus(memoDir, "analyzing"))
 	status = analyzer.GetStatus(memoDir)
 	assert.Equal(t, "analyzing", status.Status)
 
 	// Test getting status with invalid JSON
 	statusPath := filepath.Join(memoDir, "status.json")
-	os.WriteFile(statusPath, []byte("invalid json"), 0644)
+	require.NoError(t, os.WriteFile(statusPath, []byte("invalid json"), 0644))
 	status = analyzer.GetStatus(memoDir)
 	assert.Equal(t, "idle", status.Status, "Invalid JSON should fallback to idle")
 }
@@ -69,12 +69,12 @@ func TestSetStatus_IdleHasNoSince(t *testing.T) {
 	require.NoError(t, os.MkdirAll(memoDir, 0755))
 
 	// First set analyzing (has Since)
-	analyzer.SetStatus(memoDir, "analyzing")
+	require.NoError(t, analyzer.SetStatus(memoDir, "analyzing"))
 	status := analyzer.GetStatus(memoDir)
 	assert.NotNil(t, status.Since)
 
 	// Then set idle (should not have Since)
-	analyzer.SetStatus(memoDir, "idle")
+	require.NoError(t, analyzer.SetStatus(memoDir, "idle"))
 	status = analyzer.GetStatus(memoDir)
 	assert.Equal(t, "idle", status.Status)
 	assert.Nil(t, status.Since, "Idle status should not have Since timestamp")

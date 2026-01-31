@@ -61,7 +61,7 @@ func (w *Watcher) watchAll(dir string) error {
 // ScanAll traverses all files and adds them to pending, triggering initial analysis
 func (w *Watcher) ScanAll() {
 	count := 0
-	filepath.WalkDir(w.rootPath, func(p string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(w.rootPath, func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
@@ -103,7 +103,7 @@ func (w *Watcher) Run() error {
 			if e.Op&fsnotify.Create != 0 {
 				if info, err := os.Stat(e.Name); err == nil && info.IsDir() {
 					internal.LogDebug("Watching new directory: %s", e.Name)
-					w.watcher.Add(e.Name)
+					_ = w.watcher.Add(e.Name)
 				}
 			}
 			if e.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {

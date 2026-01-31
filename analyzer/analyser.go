@@ -253,7 +253,7 @@ func (a *Analyser) runPrompt(ctx context.Context, session *agent.Session, prompt
 			switch m := msg.(type) {
 			case wire.ApprovalRequest:
 				internal.LogDebug("Auto-approving request")
-				m.Respond(wire.ApprovalRequestResponseApprove)
+				_ = m.Respond(wire.ApprovalRequestResponseApprove)
 			case wire.ContentPart:
 				if m.Type == wire.ContentPartTypeText && m.Text.Valid {
 					lb.Write(m.Text.Value)

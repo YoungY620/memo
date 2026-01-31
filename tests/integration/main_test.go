@@ -98,7 +98,7 @@ func TestInitIndex(t *testing.T) {
 	// Run once mode (which should init the index)
 	// Note: This will fail because no API key, but index should be created
 	cmd := exec.Command(binary, "-once", "-path", tmpDir, "-config", "nonexistent.yaml")
-	cmd.Run() // Ignore error, we just want the index to be created
+	_ = cmd.Run() // Ignore error, we just want the index to be created
 
 	// Check if index was created
 	indexDir := filepath.Join(tmpDir, ".memo", "index")
@@ -135,7 +135,7 @@ func TestLockFile(t *testing.T) {
 
 	// First, initialize the directory
 	initCmd := exec.Command(binary, "-once", "-path", tmpDir, "-config", "nonexistent.yaml")
-	initCmd.Run()
+	_ = initCmd.Run()
 
 	// Try to run two instances (second should fail due to lock)
 	// This is tricky to test reliably, so we just verify the lock file exists after running

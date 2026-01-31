@@ -60,28 +60,20 @@ func TestValidateIndex_Valid(t *testing.T) {
 func TestValidateIndex_MissingFile(t *testing.T) {
 	dir := t.TempDir()
 	indexDir := filepath.Join(dir, ".memo", "index")
-	if err := os.MkdirAll(indexDir, 0755); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll(indexDir, 0755))
 
 	// Only create some files
-	os.WriteFile(filepath.Join(indexDir, "arch.json"), []byte(`{"modules": [], "relationships": ""}`), 0644)
+	require.NoError(t, os.WriteFile(filepath.Join(indexDir, "arch.json"), []byte(`{"modules": [], "relationships": ""}`), 0644))
 
 	result := analyzer.ValidateIndex(indexDir)
-	if result.Valid {
-		t.Error("Expected invalid result for missing files")
-	}
-	if len(result.Errors) == 0 {
-		t.Error("Expected errors for missing files")
-	}
+	assert.False(t, result.Valid, "Expected invalid result for missing files")
+	assert.NotEmpty(t, result.Errors, "Expected errors for missing files")
 }
 
 func TestValidateIndex_InvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	indexDir := filepath.Join(dir, ".memo", "index")
-	if err := os.MkdirAll(indexDir, 0755); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll(indexDir, 0755))
 
 	files := map[string]string{
 		"arch.json":      `invalid json`,
@@ -92,21 +84,17 @@ func TestValidateIndex_InvalidJSON(t *testing.T) {
 
 	for name, content := range files {
 		path := filepath.Join(indexDir, name)
-		os.WriteFile(path, []byte(content), 0644)
+		require.NoError(t, os.WriteFile(path, []byte(content), 0644))
 	}
 
 	result := analyzer.ValidateIndex(indexDir)
-	if result.Valid {
-		t.Error("Expected invalid result for invalid JSON")
-	}
+	assert.False(t, result.Valid, "Expected invalid result for invalid JSON")
 }
 
 func TestValidateIndex_SchemaMismatch(t *testing.T) {
 	dir := t.TempDir()
 	indexDir := filepath.Join(dir, ".memo", "index")
-	if err := os.MkdirAll(indexDir, 0755); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll(indexDir, 0755))
 
 	// Create files with wrong schema
 	files := map[string]string{
@@ -118,13 +106,11 @@ func TestValidateIndex_SchemaMismatch(t *testing.T) {
 
 	for name, content := range files {
 		path := filepath.Join(indexDir, name)
-		os.WriteFile(path, []byte(content), 0644)
+		require.NoError(t, os.WriteFile(path, []byte(content), 0644))
 	}
 
 	result := analyzer.ValidateIndex(indexDir)
-	if result.Valid {
-		t.Error("Expected invalid result for schema mismatch")
-	}
+	assert.False(t, result.Valid, "Expected invalid result for schema mismatch")
 }
 
 func TestFormatValidationErrors(t *testing.T) {
