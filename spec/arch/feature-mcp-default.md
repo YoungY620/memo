@@ -48,7 +48,7 @@ Default mode (no flag):
 | (none) | Watcher only (default, existing behavior) |
 | `--mcp` | MCP server only (existing) |
 | `--mcp-with-watcher` | MCP server + Watcher subprocess (new) |
-| `--once` | One-time scan + analysis, then exit |
+| `memo scan` | One-time scan + analysis, then exit |
 
 ## Files
 

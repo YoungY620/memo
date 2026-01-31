@@ -11,7 +11,7 @@
 | feature-concurrent-analysis-guard | 并发分析保护 (sem channel) |
 | feature-mcp-default | MCP + Watcher 模式 |
 | feature-mcp-query | MCP JSON 查询接口 |
-| feature-once-mode | 单次分析模式 |
+| feature-scan-mode | Scan mode (single analysis) |
 | feature-thorough-analysis | 逐模块分析 |
 | feature-watcher-single-instance | Watcher 单实例锁 + 状态感知 |
 | fix-dyld-zombie-process | macOS 僵尸进程修复 |
@@ -56,8 +56,8 @@ Session history 中存在空内容消息导致 API 错误。
 - [x] 文件监听 + 去抖动
 - [x] AI 分析 + 自动更新 index
 - [x] MCP 服务 (stdio)
-- [x] `--once` 单次分析模式
-- [x] `--mcp` MCP 模式
+- [x] `memo scan` command (single analysis)
+- [x] `memo mcp` command (MCP server)
 
 ### 稳定性
 - [x] Watcher 单实例锁 (`flock`)

@@ -52,33 +52,43 @@ Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instanc
 
 ## Usage
 
-Memo has three modes:
+Memo has three commands:
 
 ### Watch Mode (default)
 Continuously monitors file changes and updates `.memo/index`:
 ```bash
-memo                        # watch current directory
-memo --path /path/to/repo   # watch specific directory
+memo                          # watch current directory
+memo watch                    # explicit watch command
+memo watch -p /path/to/repo   # watch specific directory
+memo watch --skip-scan        # skip initial full scan (when index is up-to-date)
 ```
 
-### Scan Mode (--once)
+### Scan Mode
 Analyzes all files once, updates index, then exits. Useful for CI or initial setup:
 ```bash
-memo --once
-memo --once --path /path/to/repo
+memo scan
+memo scan -p /path/to/repo
 ```
 
-### Query Mode (--mcp)
+### MCP Mode
 Starts an MCP server for AI agents to query the index. Requires an existing `.memo/index` (run watch/scan first):
 ```bash
-memo --mcp --path /path/to/repo
+memo mcp
+memo mcp -p /path/to/repo
 ```
 
-### Other Options
+### Global Options
 ```bash
-memo --config config.yaml   # custom config file
-memo --log-level debug      # log level: error/notice/info/debug
-memo --version
+memo --version                # print version
+memo --help                   # show help
+memo <command> --help         # show command-specific help
+```
+
+### Command-Specific Options
+```bash
+# watch and scan commands
+memo watch -c config.yaml     # custom config file
+memo watch --log-level debug  # log level: error/notice/info/debug
 ```
 
 ## Configuration
@@ -109,7 +119,7 @@ Memo exposes `.memo/index` to AI agents via MCP protocol:
 
 1. **Start watcher** (keeps index updated as you code):
    ```bash
-   memo --path /path/to/project
+   cd /path/to/project && memo   # or: memo watch -p /path/to/project
    ```
 
 2. **Configure AI agent** to use memo MCP server. Example for Kimi CLI (`~/.kimi/mcp.json`):
@@ -118,7 +128,7 @@ Memo exposes `.memo/index` to AI agents via MCP protocol:
      "mcpServers": {
        "memo": {
          "command": "memo",
-         "args": ["--mcp"]
+         "args": ["mcp"]
        }
      }
    }
@@ -146,4 +156,3 @@ Memo exposes `.memo/index` to AI agents via MCP protocol:
 ## License
 
 MIT
-

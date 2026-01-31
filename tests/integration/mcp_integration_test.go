@@ -41,7 +41,7 @@ func TestMCPServer_Initialize(t *testing.T) {
 	binary, tmpDir := setupMCPTestEnv(t)
 
 	// Start MCP server
-	cmd := exec.Command(binary, "-mcp", "-path", tmpDir)
+	cmd := exec.Command(binary, "mcp", "-p", tmpDir)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		t.Fatalf("Failed to get stdin: %v", err)
@@ -90,7 +90,7 @@ func TestMCPServer_Initialize(t *testing.T) {
 func TestMCPServer_ToolsList(t *testing.T) {
 	binary, tmpDir := setupMCPTestEnv(t)
 
-	cmd := exec.Command(binary, "-mcp", "-path", tmpDir)
+	cmd := exec.Command(binary, "mcp", "-p", tmpDir)
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
@@ -139,7 +139,7 @@ func TestMCPServer_ToolsList(t *testing.T) {
 func TestMCPServer_ToolCall(t *testing.T) {
 	binary, tmpDir := setupMCPTestEnv(t)
 
-	cmd := exec.Command(binary, "-mcp", "-path", tmpDir)
+	cmd := exec.Command(binary, "mcp", "-p", tmpDir)
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
@@ -183,7 +183,7 @@ func TestMCPServer_ToolCall(t *testing.T) {
 func TestMCPServer_GetValue(t *testing.T) {
 	binary, tmpDir := setupMCPTestEnv(t)
 
-	cmd := exec.Command(binary, "-mcp", "-path", tmpDir)
+	cmd := exec.Command(binary, "mcp", "-p", tmpDir)
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
@@ -221,7 +221,7 @@ func TestMCPServer_GetValue(t *testing.T) {
 func TestMCPServer_InvalidMethod(t *testing.T) {
 	binary, tmpDir := setupMCPTestEnv(t)
 
-	cmd := exec.Command(binary, "-mcp", "-path", tmpDir)
+	cmd := exec.Command(binary, "mcp", "-p", tmpDir)
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
@@ -251,7 +251,7 @@ func TestMCPServer_InvalidMethod(t *testing.T) {
 func TestMCPServer_Shutdown(t *testing.T) {
 	binary, tmpDir := setupMCPTestEnv(t)
 
-	cmd := exec.Command(binary, "-mcp", "-path", tmpDir)
+	cmd := exec.Command(binary, "mcp", "-p", tmpDir)
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 
@@ -281,7 +281,7 @@ func TestMCPServer_Shutdown(t *testing.T) {
 func TestMCPServer_InvalidJSON(t *testing.T) {
 	binary, tmpDir := setupMCPTestEnv(t)
 
-	cmd := exec.Command(binary, "-mcp", "-path", tmpDir)
+	cmd := exec.Command(binary, "mcp", "-p", tmpDir)
 	stdin, _ := cmd.StdinPipe()
 	stdout, _ := cmd.StdoutPipe()
 

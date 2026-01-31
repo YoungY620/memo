@@ -36,7 +36,7 @@ func buildBinary(t *testing.T) string {
 func TestVersion(t *testing.T) {
 	binary := buildBinary(t)
 
-	cmd := exec.Command(binary, "-version")
+	cmd := exec.Command(binary, "--version")
 	output, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("Version command failed: %v", err)
@@ -50,24 +50,23 @@ func TestVersion(t *testing.T) {
 func TestHelp(t *testing.T) {
 	binary := buildBinary(t)
 
-	cmd := exec.Command(binary, "-help")
+	cmd := exec.Command(binary, "--help")
 	output, err := cmd.CombinedOutput()
 
-	// -help returns exit code 2 in Go, so we just check output
-	_ = err
+	// --help returns exit code 0 with cobra
+	if err != nil {
+		t.Fatalf("Help command failed: %v", err)
+	}
 
 	outputStr := string(output)
-	if !strings.Contains(outputStr, "-path") {
-		t.Errorf("Help should mention -path flag, got: %s", outputStr)
+	if !strings.Contains(outputStr, "watch") {
+		t.Errorf("Help should mention watch command, got: %s", outputStr)
 	}
-	if !strings.Contains(outputStr, "-config") {
-		t.Errorf("Help should mention -config flag, got: %s", outputStr)
+	if !strings.Contains(outputStr, "scan") {
+		t.Errorf("Help should mention scan command, got: %s", outputStr)
 	}
-	if !strings.Contains(outputStr, "-once") {
-		t.Errorf("Help should mention -once flag, got: %s", outputStr)
-	}
-	if !strings.Contains(outputStr, "-mcp") {
-		t.Errorf("Help should mention -mcp flag, got: %s", outputStr)
+	if !strings.Contains(outputStr, "mcp") {
+		t.Errorf("Help should mention mcp command, got: %s", outputStr)
 	}
 }
 
@@ -77,7 +76,7 @@ func TestMCPMode_NoIndex(t *testing.T) {
 	// Create a directory without .memo/index
 	tmpDir := t.TempDir()
 
-	cmd := exec.Command(binary, "-mcp", "-path", tmpDir)
+	cmd := exec.Command(binary, "mcp", "-p", tmpDir)
 	output, err := cmd.CombinedOutput()
 
 	// Should fail because no index exists
@@ -85,7 +84,7 @@ func TestMCPMode_NoIndex(t *testing.T) {
 		t.Error("MCP mode should fail without index directory")
 	}
 
-	if !strings.Contains(string(output), "Index directory not found") {
+	if !strings.Contains(string(output), "index directory not found") {
 		t.Errorf("Should report missing index, got: %s", output)
 	}
 }
@@ -95,9 +94,9 @@ func TestInitIndex(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	// Run once mode (which should init the index)
+	// Run scan mode (which should init the index)
 	// Note: This will fail because no API key, but index should be created
-	cmd := exec.Command(binary, "-once", "-path", tmpDir, "-config", "nonexistent.yaml")
+	cmd := exec.Command(binary, "scan", "-p", tmpDir, "-c", "nonexistent.yaml")
 	_ = cmd.Run() // Ignore error, we just want the index to be created
 
 	// Check if index was created
@@ -134,7 +133,7 @@ func TestLockFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// First, initialize the directory
-	initCmd := exec.Command(binary, "-once", "-path", tmpDir, "-config", "nonexistent.yaml")
+	initCmd := exec.Command(binary, "scan", "-p", tmpDir, "-c", "nonexistent.yaml")
 	_ = initCmd.Run()
 
 	// Try to run two instances (second should fail due to lock)
