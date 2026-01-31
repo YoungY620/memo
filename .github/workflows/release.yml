@@ -85,7 +85,7 @@ jobs:
             goarch: arm64
             name: linux-arm64
             suffix: linux-arm64
-          - os: macos-13
+          - os: macos-latest
             goos: darwin
             goarch: amd64
             name: darwin-amd64
