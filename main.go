@@ -17,10 +17,10 @@ var Version = "dev"
 
 func main() {
 	var (
-		pathFlag           = flag.String("path", "", "Path to watch (default: current directory)")
-		configFlag         = flag.String("config", "config.yaml", "Path to config file")
-		versionFlag        = flag.Bool("version", false, "Print version and exit")
-		onceFlag           = flag.Bool("once", false, "Run once and exit (no watch mode)")
+		pathFlag     = flag.String("path", "", "Path to watch (default: current directory)")
+		configFlag   = flag.String("config", "config.yaml", "Path to config file")
+		versionFlag  = flag.Bool("version", false, "Print version and exit")
+		onceFlag     = flag.Bool("once", false, "Run once and exit (no watch mode)")
 		mcpFlag      = flag.Bool("mcp", false, "Run as MCP server (stdio)")
 		logLevelFlag = flag.String("log-level", "", "Log level: error, notice, info, debug")
 	)
@@ -118,6 +118,12 @@ func main() {
 		log.Fatalf("[ERROR] Failed to create watcher: %v", err)
 	}
 	defer watcher.Close()
+
+	// Print banner (watcher and once mode, not MCP mode)
+	PrintBanner(BannerOptions{
+		WorkDir: workDir,
+		Version: Version,
+	})
 
 	// Initial scan of all files
 	logInfo("Watcher started, workDir=%s", workDir)
