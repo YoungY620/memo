@@ -1,4 +1,4 @@
-package main
+package analyzer
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/YoungY620/memo/internal"
 
 	agent "github.com/MoonshotAI/kimi-agent-sdk/go"
 	"github.com/MoonshotAI/kimi-agent-sdk/go/wire"
@@ -28,14 +30,21 @@ const maxFilesPerBatch = 100
 func loadPrompt(name string) string {
 	data, err := promptFS.ReadFile("prompts/" + name + ".md")
 	if err != nil {
-		logError("Failed to load prompt %s: %v", name, err)
+		internal.LogError("Failed to load prompt %s: %v", name, err)
 		return ""
 	}
 	return string(data)
 }
 
+// AgentConfig holds the agent configuration
+type AgentConfig struct {
+	APIKey string
+	Model  string
+}
+
+// Analyser performs code analysis using AI
 type Analyser struct {
-	cfg       *Config
+	agentCfg  AgentConfig
 	indexDir  string
 	workDir   string
 	sessionID string
@@ -102,34 +111,36 @@ func splitIntoBatches(files []string, threshold int) [][]string {
 	return batches
 }
 
-func NewAnalyser(cfg *Config, workDir string) *Analyser {
+// NewAnalyser creates a new Analyser instance
+func NewAnalyser(agentCfg AgentConfig, workDir string) *Analyser {
 	sessionID := generateSessionID(workDir)
-	logInfo("Using session ID: %s for workDir: %s", sessionID, workDir)
+	internal.LogInfo("Using session ID: %s for workDir: %s", sessionID, workDir)
 
 	return &Analyser{
-		cfg:       cfg,
+		agentCfg:  agentCfg,
 		indexDir:  filepath.Join(workDir, ".memo", "index"),
 		workDir:   workDir,
 		sessionID: sessionID,
 	}
 }
 
+// Analyse performs analysis on the given changed files
 func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	// Convert to relative paths
 	relFiles := toRelativePaths(changedFiles, a.workDir)
 
 	// Split into batches if needed
 	batches := splitIntoBatches(relFiles, maxFilesPerBatch)
-	logInfo("Starting analysis for %d files in %d batch(es)", len(changedFiles), len(batches))
+	internal.LogInfo("Starting analysis for %d files in %d batch(es)", len(changedFiles), len(batches))
 
 	// Mark analysis in progress
 	memoDir := filepath.Dir(a.indexDir)
 	if err := SetStatus(memoDir, "analyzing"); err != nil {
-		logError("Failed to set status: %v", err)
+		internal.LogError("Failed to set status: %v", err)
 	}
 	defer func() {
 		if err := SetStatus(memoDir, "idle"); err != nil {
-			logError("Failed to clear status: %v", err)
+			internal.LogError("Failed to clear status: %v", err)
 		}
 	}()
 
@@ -144,7 +155,7 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 }
 
 func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, totalBatches int) error {
-	logInfo("Processing batch %d/%d (%d files)", batchNum, totalBatches, len(files))
+	internal.LogInfo("Processing batch %d/%d (%d files)", batchNum, totalBatches, len(files))
 
 	var session *agent.Session
 	var err error
@@ -154,18 +165,18 @@ func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, t
 	mcpFile := filepath.Join(a.workDir, ".memo", "mcp.json")
 
 	// Use kimi defaults if agent config is not set
-	if a.cfg.Agent.APIKey != "" && a.cfg.Agent.Model != "" {
-		logDebug("Using configured model: %s", a.cfg.Agent.Model)
+	if a.agentCfg.APIKey != "" && a.agentCfg.Model != "" {
+		internal.LogDebug("Using configured model: %s", a.agentCfg.Model)
 		session, err = agent.NewSession(
-			agent.WithAPIKey(a.cfg.Agent.APIKey),
-			agent.WithModel(a.cfg.Agent.Model),
+			agent.WithAPIKey(a.agentCfg.APIKey),
+			agent.WithModel(a.agentCfg.Model),
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
 			agent.WithMCPConfigFile(mcpFile),
 			agent.WithSession(a.sessionID),
 		)
 	} else {
-		logDebug("Using kimi default configuration")
+		internal.LogDebug("Using kimi default configuration")
 		session, err = agent.NewSession(
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
@@ -192,35 +203,35 @@ func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, t
 	initialPrompt := contextPrompt + "\n\n" + analysePrompt + batchInfo + filesInfo
 
 	// Send initial prompt
-	logDebug("Batch %d/%d: sending initial prompt, files=%v", batchNum, totalBatches, files)
+	internal.LogDebug("Batch %d/%d: sending initial prompt, files=%v", batchNum, totalBatches, files)
 	start := time.Now()
 	if err := a.runPrompt(ctx, session, initialPrompt); err != nil {
-		logError("Batch %d/%d: initial prompt failed: %v", batchNum, totalBatches, err)
+		internal.LogError("Batch %d/%d: initial prompt failed: %v", batchNum, totalBatches, err)
 		return err
 	}
-	logDebug("Batch %d/%d: initial prompt completed, duration=%s", batchNum, totalBatches, time.Since(start))
+	internal.LogDebug("Batch %d/%d: initial prompt completed, duration=%s", batchNum, totalBatches, time.Since(start))
 
 	// Validation loop
 	maxRetries := 5
 	for i := 0; i < maxRetries; i++ {
-		logDebug("Validating .memo/index files (attempt %d/%d)", i+1, maxRetries)
+		internal.LogDebug("Validating .memo/index files (attempt %d/%d)", i+1, maxRetries)
 		result := ValidateIndex(a.indexDir)
 		if result.Valid {
-			logInfo("Batch %d/%d validation passed", batchNum, totalBatches)
+			internal.LogInfo("Batch %d/%d validation passed", batchNum, totalBatches)
 			return nil
 		}
 
 		errMsg := FormatValidationErrors(result)
-		logError("Batch %d/%d: validation failed (attempt %d/%d): %s", batchNum, totalBatches, i+1, maxRetries, errMsg)
+		internal.LogError("Batch %d/%d: validation failed (attempt %d/%d): %s", batchNum, totalBatches, i+1, maxRetries, errMsg)
 
 		// Send feedback prompt
 		feedbackPrompt := loadPrompt("feedback")
 		errorInfo := "Validation errors:\n" + FormatValidationErrors(result)
 		fullFeedback := loadPrompt("context") + "\n\n" + feedbackPrompt + "\n\n" + errorInfo
 
-		logDebug("Batch %d/%d: sending feedback prompt (attempt %d)", batchNum, totalBatches, i+1)
+		internal.LogDebug("Batch %d/%d: sending feedback prompt (attempt %d)", batchNum, totalBatches, i+1)
 		if err := a.runPrompt(ctx, session, fullFeedback); err != nil {
-			logError("Batch %d/%d: feedback prompt failed: %v", batchNum, totalBatches, err)
+			internal.LogError("Batch %d/%d: feedback prompt failed: %v", batchNum, totalBatches, err)
 			return err
 		}
 	}
@@ -234,32 +245,32 @@ func (a *Analyser) runPrompt(ctx context.Context, session *agent.Session, prompt
 		return fmt.Errorf("prompt failed: %w", err)
 	}
 
-	lb := NewLineBuffer(500 * time.Millisecond)
+	lb := internal.NewLineBuffer(500 * time.Millisecond)
 
 	// Consume all messages
 	for step := range turn.Steps {
 		for msg := range step.Messages {
 			switch m := msg.(type) {
 			case wire.ApprovalRequest:
-				logDebug("Auto-approving request")
+				internal.LogDebug("Auto-approving request")
 				m.Respond(wire.ApprovalRequestResponseApprove)
 			case wire.ContentPart:
 				if m.Type == wire.ContentPartTypeText && m.Text.Valid {
 					lb.Write(m.Text.Value)
 					if lines := lb.Flush(false); lines != "" {
-						logDebug("Agent output: %s", lines)
+						internal.LogDebug("Agent output: %s", lines)
 					}
 				}
 			case wire.StatusUpdate:
 				// StatusUpdate usually means a generation round is complete
 				if lines := lb.Flush(true); lines != "" {
-					logDebug("Agent output: %s", lines)
+					internal.LogDebug("Agent output: %s", lines)
 				}
 			}
 		}
 		// Step ended, force flush remaining content
 		if lines := lb.Flush(true); lines != "" {
-			logDebug("Agent output: %s", lines)
+			internal.LogDebug("Agent output: %s", lines)
 		}
 	}
 

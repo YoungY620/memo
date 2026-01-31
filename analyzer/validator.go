@@ -1,4 +1,4 @@
-package main
+package analyzer
 
 import (
 	"fmt"
@@ -137,11 +137,13 @@ var schemas = map[string]string{
 	}`,
 }
 
+// ValidationResult holds the result of index validation
 type ValidationResult struct {
 	Valid  bool
 	Errors []string
 }
 
+// ValidateIndex validates all JSON files in the index directory
 func ValidateIndex(indexDir string) ValidationResult {
 	var allErrors []string
 
@@ -175,6 +177,7 @@ func ValidateIndex(indexDir string) ValidationResult {
 	}
 }
 
+// FormatValidationErrors formats validation errors as a string
 func FormatValidationErrors(result ValidationResult) string {
 	if result.Valid {
 		return ""

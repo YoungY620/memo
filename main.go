@@ -4,12 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	stdlog "log"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 
+	"github.com/YoungY620/memo/analyzer"
+	"github.com/YoungY620/memo/internal"
 	"github.com/YoungY620/memo/mcp"
 )
 
@@ -37,7 +39,7 @@ func main() {
 		var err error
 		workDir, err = os.Getwd()
 		if err != nil {
-			log.Fatalf("[ERROR] Failed to get current directory: %v", err)
+			stdlog.Fatalf("[ERROR] Failed to get current directory: %v", err)
 		}
 	}
 	workDir, _ = filepath.Abs(workDir)
@@ -46,10 +48,10 @@ func main() {
 	if *mcpFlag {
 		indexDir := filepath.Join(workDir, ".memo", "index")
 		if _, err := os.Stat(indexDir); os.IsNotExist(err) {
-			log.Fatalf("[ERROR] Index directory not found: %s\nRun 'memo' first to initialize the index.", indexDir)
+			stdlog.Fatalf("[ERROR] Index directory not found: %s\nRun 'memo' first to initialize the index.", indexDir)
 		}
 		if err := mcp.Serve(workDir); err != nil {
-			log.Fatalf("[ERROR] MCP server error: %v", err)
+			stdlog.Fatalf("[ERROR] MCP server error: %v", err)
 		}
 		return
 	}
@@ -57,88 +59,92 @@ func main() {
 	// Load config
 	cfg, err := LoadConfig(*configFlag)
 	if err != nil {
-		log.Fatalf("[ERROR] Failed to load config: %v", err)
+		stdlog.Fatalf("[ERROR] Failed to load config: %v", err)
 	}
 	// Set log level: flag takes precedence over config
 	if *logLevelFlag != "" {
-		SetLogLevel(*logLevelFlag)
+		internal.SetLogLevel(*logLevelFlag)
 	} else {
-		SetLogLevel(cfg.LogLevel)
+		internal.SetLogLevel(cfg.LogLevel)
 	}
-	logDebug("Config loaded: logLevel=%s, debounce=%dms, maxWait=%dms", cfg.LogLevel, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs)
+	internal.LogDebug("Config loaded: logLevel=%s, debounce=%dms, maxWait=%dms", cfg.LogLevel, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs)
 
 	// Merge .gitignore patterns if found
 	if err := cfg.MergeGitignore(workDir); err != nil {
-		logError("Failed to load .gitignore: %v", err)
+		internal.LogError("Failed to load .gitignore: %v", err)
 	}
-	logDebug("Total ignore patterns: %d", len(cfg.Watch.IgnorePatterns))
+	internal.LogDebug("Total ignore patterns: %d", len(cfg.Watch.IgnorePatterns))
 
 	// Initialize .memo/index directory
 	indexDir := filepath.Join(workDir, ".memo", "index")
 	if err := initIndex(indexDir); err != nil {
-		log.Fatalf("[ERROR] Failed to initialize .memo/index: %v", err)
+		stdlog.Fatalf("[ERROR] Failed to initialize .memo/index: %v", err)
 	}
-	logDebug("Initialized .memo/index directory: %s", indexDir)
+	internal.LogDebug("Initialized .memo/index directory: %s", indexDir)
 
 	// Acquire single instance lock (watcher mode only)
 	memoDir := filepath.Join(workDir, ".memo")
-	lockFile, err := TryLock(memoDir)
+	lockFile, err := analyzer.TryLock(memoDir)
 	if err != nil {
-		log.Fatalf("[ERROR] %v", err)
+		stdlog.Fatalf("[ERROR] %v", err)
 	}
-	defer Unlock(lockFile)
+	defer analyzer.Unlock(lockFile)
 
 	// Initialize history logger for watcher
-	InitHistoryLogger(memoDir)
-	defer CloseHistoryLogger()
+	internal.InitHistoryLogger(memoDir, "watcher")
+	defer internal.CloseHistoryLogger()
 
 	// Ensure status is idle on startup and exit
-	if err := SetStatus(memoDir, "idle"); err != nil {
-		logError("Failed to set initial status: %v", err)
+	if err := analyzer.SetStatus(memoDir, "idle"); err != nil {
+		internal.LogError("Failed to set initial status: %v", err)
 	}
 	defer func() {
-		if err := SetStatus(memoDir, "idle"); err != nil {
-			logError("Failed to reset status on exit: %v", err)
+		if err := analyzer.SetStatus(memoDir, "idle"); err != nil {
+			internal.LogError("Failed to reset status on exit: %v", err)
 		}
 	}()
 
 	// Create analyser
-	analyser := NewAnalyser(cfg, workDir)
+	agentCfg := analyzer.AgentConfig{
+		APIKey: cfg.Agent.APIKey,
+		Model:  cfg.Agent.Model,
+	}
+	ana := analyzer.NewAnalyser(agentCfg, workDir)
 
 	// Create watcher
-	watcher, err := NewWatcher(workDir, cfg.Watch.IgnorePatterns, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs, func(files []string) {
-		logInfo("Triggered with %d changed files", len(files))
-		logDebug("Changed files: %v", files)
+	watcher, err := analyzer.NewWatcher(workDir, cfg.Watch.IgnorePatterns, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs, func(files []string) {
+		internal.LogInfo("Triggered with %d changed files", len(files))
+		internal.LogDebug("Changed files: %v", files)
 		ctx := context.Background()
-		if err := analyser.Analyse(ctx, files); err != nil {
-			logError("Analysis failed: %v", err)
+		if err := ana.Analyse(ctx, files); err != nil {
+			internal.LogError("Analysis failed: %v", err)
 		}
 	})
 	if err != nil {
-		log.Fatalf("[ERROR] Failed to create watcher: %v", err)
+		stdlog.Fatalf("[ERROR] Failed to create watcher: %v", err)
 	}
 	defer watcher.Close()
 
 	// Print banner (watcher and once mode, not MCP mode)
-	PrintBanner(BannerOptions{
+	analyzer.PrintBanner(analyzer.BannerOptions{
 		WorkDir: workDir,
 		Version: Version,
 	})
 
 	// Initial scan of all files
-	logInfo("Watcher started, workDir=%s", workDir)
+	internal.LogInfo("Watcher started, workDir=%s", workDir)
 	watcher.ScanAll()
-	logDebug("Initial scan completed")
+	internal.LogDebug("Initial scan completed")
 
 	// Once mode: flush and exit
 	if *onceFlag {
 		watcher.Flush()
-		logInfo("Once mode completed")
+		internal.LogInfo("Once mode completed")
 		return
 	}
 
 	// Watch mode
-	logInfo("Memo watching: %s", workDir)
+	internal.LogInfo("Memo watching: %s", workDir)
 
 	// Handle shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -146,12 +152,12 @@ func main() {
 
 	go func() {
 		if err := watcher.Run(); err != nil {
-			logError("Watcher error: %v", err)
+			internal.LogError("Watcher error: %v", err)
 		}
 	}()
 
 	<-sigChan
-	logInfo("Shutting down...")
+	internal.LogInfo("Shutting down...")
 }
 
 func initIndex(indexDir string) error {
@@ -169,7 +175,7 @@ func initIndex(indexDir string) error {
 	for name, content := range files {
 		path := filepath.Join(indexDir, name)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			logDebug("Creating %s", path)
+			internal.LogDebug("Creating %s", path)
 			if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 				return err
 			}
@@ -182,7 +188,7 @@ func initIndex(indexDir string) error {
 	memoDir := filepath.Dir(indexDir)
 	mcpFile := filepath.Join(memoDir, "mcp.json")
 	if _, err := os.Stat(mcpFile); os.IsNotExist(err) {
-		logDebug("Creating %s", mcpFile)
+		internal.LogDebug("Creating %s", mcpFile)
 		if err := os.WriteFile(mcpFile, []byte("{}"), 0644); err != nil {
 			return err
 		}
@@ -196,7 +202,7 @@ watcher.lock
 status.json
 .history
 `
-		logDebug("Creating %s", gitignoreFile)
+		internal.LogDebug("Creating %s", gitignoreFile)
 		if err := os.WriteFile(gitignoreFile, []byte(gitignoreContent), 0644); err != nil {
 			return err
 		}

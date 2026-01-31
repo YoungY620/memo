@@ -1,4 +1,4 @@
-package main
+package analyzer
 
 import (
 	"os"
@@ -7,15 +7,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/YoungY620/memo/internal"
 	"github.com/fsnotify/fsnotify"
 )
 
 type Watcher struct {
 	debounceMs, maxWaitMs int
-	ignorePatterns              []string
-	onChange                    func([]string)
-	watcher                     *fsnotify.Watcher
-	rootPath                    string
+	ignorePatterns        []string
+	onChange              func([]string)
+	watcher               *fsnotify.Watcher
+	rootPath              string
 
 	mu                sync.Mutex
 	pending           map[string]struct{}
@@ -71,7 +72,7 @@ func (w *Watcher) ScanAll() {
 		count++
 		return nil
 	})
-	logDebug("ScanAll: added %d files to pending", count)
+	internal.LogDebug("ScanAll: added %d files to pending", count)
 }
 
 func (w *Watcher) ignored(path string) bool {
@@ -98,10 +99,10 @@ func (w *Watcher) Run() error {
 			if w.ignored(e.Name) {
 				continue
 			}
-			logDebug("Event: %s %s", e.Op, e.Name)
+			internal.LogDebug("Event: %s %s", e.Op, e.Name)
 			if e.Op&fsnotify.Create != 0 {
 				if info, err := os.Stat(e.Name); err == nil && info.IsDir() {
-					logDebug("Watching new directory: %s", e.Name)
+					internal.LogDebug("Watching new directory: %s", e.Name)
 					w.watcher.Add(e.Name)
 				}
 			}
@@ -113,7 +114,7 @@ func (w *Watcher) Run() error {
 				return nil
 			}
 			if err != nil {
-				logError("Watcher error: %v", err)
+				internal.LogError("Watcher error: %v", err)
 			}
 		}
 	}
@@ -144,7 +145,7 @@ func (w *Watcher) Flush() {
 	case w.sem <- struct{}{}:
 		// acquired
 	default:
-		logDebug("Analysis in progress, skipping flush (files remain in pending)")
+		internal.LogDebug("Analysis in progress, skipping flush (files remain in pending)")
 		return
 	}
 	defer func() { <-w.sem }()

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/YoungY620/memo/internal"
 	"gopkg.in/yaml.v3"
 )
 
@@ -145,7 +146,7 @@ func (c *Config) MergeGitignore(workDir string) error {
 	}
 
 	if added > 0 {
-		logDebug("Merged %d patterns from .gitignore", added)
+		internal.LogDebug("Merged %d patterns from .gitignore", added)
 	}
 
 	return nil
