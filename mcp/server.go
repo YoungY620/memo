@@ -372,8 +372,17 @@ func (s *Server) sendResponse(resp *Response) {
 	fmt.Fprintln(s.writer, string(data))
 }
 
+// Close releases resources held by the server
+func (s *Server) Close() error {
+	if s.history != nil {
+		return s.history.Close()
+	}
+	return nil
+}
+
 // Serve starts an MCP server for the given work directory
 func Serve(workDir string) error {
 	server := NewServer(workDir)
+	defer server.Close()
 	return server.Run()
 }

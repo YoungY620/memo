@@ -43,7 +43,7 @@ func newTestServer(t *testing.T) (*testServer, string) {
 		os.WriteFile(filepath.Join(indexDir, name), []byte(content), 0644)
 	}
 
-	// Ensure history logger is closed after test to release file handles (Windows)
+	// Ensure global history logger is closed after test
 	t.Cleanup(internal.CloseHistoryLogger)
 
 	return &testServer{
@@ -52,11 +52,17 @@ func newTestServer(t *testing.T) (*testServer, string) {
 	}, tmpDir
 }
 
-func TestServer_Initialize(t *testing.T) {
+// newTestServerWithMCP creates test server and MCP server, ensuring proper cleanup
+func newTestServerWithMCP(t *testing.T) (*mcp.Server, string) {
 	ts, workDir := newTestServer(t)
-
-	// Create a real server
+	_ = ts
 	server := mcp.NewServer(workDir)
+	t.Cleanup(func() { server.Close() })
+	return server, workDir
+}
+
+func TestServer_Initialize(t *testing.T) {
+	server, _ := newTestServerWithMCP(t)
 
 	// Test initialize request parsing
 	initReq := `{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}`
@@ -71,14 +77,11 @@ func TestServer_Initialize(t *testing.T) {
 		t.Errorf("Expected method 'initialize', got '%s'", req.Method)
 	}
 
-	_ = ts
 	_ = server
 }
 
 func TestServer_ToolsList(t *testing.T) {
-	_, workDir := newTestServer(t)
-
-	server := mcp.NewServer(workDir)
+	server, _ := newTestServerWithMCP(t)
 
 	// Verify server is created
 	if server == nil {
@@ -215,6 +218,7 @@ func TestServe_NonExistentDir(t *testing.T) {
 	t.Cleanup(internal.CloseHistoryLogger)
 
 	server := mcp.NewServer(tmpDir)
+	t.Cleanup(func() { server.Close() })
 
 	if server == nil {
 		t.Error("Server should be created even for new directory")
@@ -242,8 +246,7 @@ func TestServer_ReadLine(t *testing.T) {
 }
 
 func TestServer_GetStatus_Idle(t *testing.T) {
-	_, workDir := newTestServer(t)
-	server := mcp.NewServer(workDir)
+	server, _ := newTestServerWithMCP(t)
 
 	// Status should be idle by default
 	status := server.GetStatusFromServer()
@@ -265,6 +268,7 @@ func TestServer_GetStatus_Analyzing(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(memoDir, "status.json"), data, 0644))
 
 	server := mcp.NewServer(workDir)
+	t.Cleanup(func() { server.Close() })
 	status := server.GetStatusFromServer()
 
 	assert.Equal(t, "analyzing", status.Status)
@@ -279,6 +283,7 @@ func TestServer_GetStatus_InvalidJSON(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(memoDir, "status.json"), []byte("invalid json"), 0644))
 
 	server := mcp.NewServer(workDir)
+	t.Cleanup(func() { server.Close() })
 	status := server.GetStatusFromServer()
 
 	// Should fallback to idle
@@ -384,8 +389,7 @@ func TestServer_ErrorResponse(t *testing.T) {
 }
 
 func TestServer_ToolsDescription(t *testing.T) {
-	_, workDir := newTestServer(t)
-	server := mcp.NewServer(workDir)
+	server, _ := newTestServerWithMCP(t)
 	require.NotNil(t, server)
 
 	// Server should have 2 tools defined
