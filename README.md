@@ -118,7 +118,7 @@ Memo exposes `.memo/index` to AI agents via MCP protocol:
      "mcpServers": {
        "memo": {
          "command": "memo",
-         "args": ["--mcp", "--path", "/path/to/project"]
+         "args": ["--mcp"]
        }
      }
    }
