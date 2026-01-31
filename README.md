@@ -4,6 +4,24 @@ AI-powered codebase memory for coding agents. Watches file changes and maintains
 
 ## Installation
 
+### Linux / macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YoungY620/memo/main/install.sh | sh
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/YoungY620/memo/main/install.ps1 | iex
+```
+
+### Update
+
+Run the same installation command to update to the latest version. Memo also checks for updates automatically on startup.
+
+### Build from Source
+
 ```bash
 git clone https://github.com/YoungY620/memo.git
 cd memo

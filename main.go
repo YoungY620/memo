@@ -139,10 +139,28 @@ Flags:
 	}
 	defer watcher.Close()
 
+	// Start async update check
+	updateCh := internal.CheckUpdateAsync(Version)
+
 	// Print banner (watcher and once mode, not MCP mode)
+	// Wait briefly for update check result (non-blocking after timeout)
+	var updateInfo *analyzer.UpdateInfo
+	select {
+	case result := <-updateCh:
+		if result != nil {
+			updateInfo = &analyzer.UpdateInfo{
+				LatestVersion: result.LatestVersion,
+				UpdateCommand: result.UpdateCommand,
+			}
+		}
+	default:
+		// Update check not ready yet, continue without it
+	}
+
 	analyzer.PrintBanner(analyzer.BannerOptions{
-		WorkDir: workDir,
-		Version: Version,
+		WorkDir:    workDir,
+		Version:    Version,
+		UpdateInfo: updateInfo,
 	})
 
 	// Initial scan of all files

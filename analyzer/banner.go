@@ -13,6 +13,7 @@ import (
 const (
 	colorYellow = "\033[38;5;178m" // Muted gold
 	colorDim    = "\033[38;5;136m" // Dark olive/brown for borders
+	colorCyan   = "\033[38;5;80m"  // Cyan for update notice
 	colorReset  = "\033[0m"
 )
 
@@ -28,8 +29,15 @@ var bannerArt = []string{
 
 // BannerOptions contains the information to display in the banner
 type BannerOptions struct {
-	WorkDir string
-	Version string
+	WorkDir    string
+	Version    string
+	UpdateInfo *UpdateInfo // Optional: update information to display
+}
+
+// UpdateInfo contains information about an available update
+type UpdateInfo struct {
+	LatestVersion string
+	UpdateCommand string
 }
 
 // PrintBanner prints the startup banner with width adaptation
@@ -122,6 +130,16 @@ func printFullBanner(opts BannerOptions, greeting string, termWidth int) {
 		colored := "  " + colorYellow + "✨ " + greeting + colorReset
 		fmt.Println(line(plain, colored))
 	}
+	// Update notice
+	if opts.UpdateInfo != nil {
+		fmt.Println(simpleLine(""))
+		plain1 := "  ⬆ New version " + opts.UpdateInfo.LatestVersion + " available"
+		colored1 := "  " + colorCyan + "⬆ New version " + opts.UpdateInfo.LatestVersion + " available" + colorReset
+		fmt.Println(line(plain1, colored1))
+		plain2 := "    " + opts.UpdateInfo.UpdateCommand
+		colored2 := "    " + colorDim + opts.UpdateInfo.UpdateCommand + colorReset
+		fmt.Println(line(plain2, colored2))
+	}
 	fmt.Println(simpleLine(""))
 	fmt.Println(colorDim + "╰" + strings.Repeat("─", innerWidth) + "╯" + colorReset)
 	fmt.Println()
@@ -140,6 +158,12 @@ func printCompactBanner(opts BannerOptions, greeting string) {
 	if greeting != "" {
 		fmt.Println("  " + colorYellow + greeting + colorReset)
 	}
+	// Update notice
+	if opts.UpdateInfo != nil {
+		fmt.Println()
+		fmt.Println("  " + colorCyan + "⬆ New version " + opts.UpdateInfo.LatestVersion + " available" + colorReset)
+		fmt.Println("    " + colorDim + opts.UpdateInfo.UpdateCommand + colorReset)
+	}
 	fmt.Println()
 }
 
@@ -149,6 +173,11 @@ func printMinimalBanner(opts BannerOptions, greeting string) {
 	fmt.Printf("%smemo%s %s\n", colorYellow, colorReset, opts.Version)
 	if greeting != "" {
 		fmt.Println(colorYellow + greeting + colorReset)
+	}
+	// Update notice
+	if opts.UpdateInfo != nil {
+		fmt.Println(colorCyan + "⬆ " + opts.UpdateInfo.LatestVersion + " available" + colorReset)
+		fmt.Println(colorDim + opts.UpdateInfo.UpdateCommand + colorReset)
 	}
 }
 

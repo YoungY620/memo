@@ -176,3 +176,64 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+
+  test-install:
+    name: Test Install (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+          - os: macos-latest
+            name: macos
+          - os: windows-latest
+            name: windows
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      # Unix (Linux/macOS)
+      - name: Run install script (Unix)
+        if: runner.os != 'Windows'
+        run: sh install.sh
+
+      - name: Verify installation (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          # Check binary exists and is executable
+          test -x "$HOME/.local/bin/memo" || exit 1
+          # Check it runs
+          "$HOME/.local/bin/memo" --version
+          # Check version matches release
+          "$HOME/.local/bin/memo" --version | grep -q "${{ steps.version.outputs.version }}"
+
+      # Windows
+      - name: Run install script (Windows)
+        if: runner.os == 'Windows'
+        run: powershell -File install.ps1
+
+      - name: Verify installation (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Check binary exists
+          $exe = "$env:USERPROFILE\.local\bin\memo.exe"
+          if (-not (Test-Path $exe)) { exit 1 }
+          # Check it runs and version matches
+          $output = & $exe --version
+          Write-Host $output
+          if ($output -notmatch "${{ steps.version.outputs.version }}") { exit 1 }
