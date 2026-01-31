@@ -20,9 +20,10 @@ jobs:
           cache: true
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: latest
+          version: v1.64.8
+          install-mode: goinstall
           args: --timeout=5m
 
   test:
@@ -46,10 +47,10 @@ jobs:
         run: go mod download
 
       - name: Run unit tests
-        run: go test -v -race -timeout 120s ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
+        run: go test -v -race -timeout 120s -tags testing ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
 
       - name: Run integration tests
-        run: go test -v -race -timeout 300s ./tests/integration/...
+        run: go test -v -race -timeout 300s -tags testing ./tests/integration/...
 
   test-coverage:
     name: Coverage
@@ -65,7 +66,7 @@ jobs:
           cache: true
 
       - name: Run tests with coverage
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -v -race -tags testing -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
