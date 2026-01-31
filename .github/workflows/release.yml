@@ -36,7 +36,6 @@ jobs:
   test:
     name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    # 与 lint 并行执行
     strategy:
       fail-fast: false
       matrix:
@@ -63,9 +62,7 @@ jobs:
         run: go mod download
 
       - name: Run unit tests
-        run: |
-          go test -v -race -timeout 120s -tags testing \
-            ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
+        run: go test -v -race -timeout 120s -tags testing ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
 
       - name: Run integration tests
         run: go test -v -race -timeout 300s -tags testing ./tests/integration/...
@@ -73,7 +70,7 @@ jobs:
   build:
     name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    needs: [lint, test]  # 等待 lint 和 test 都完成
+    needs: [lint, test]
     strategy:
       fail-fast: false
       matrix:

@@ -31,7 +31,6 @@ jobs:
   test:
     name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    # 无 needs，与 lint 并行执行
     strategy:
       fail-fast: false
       matrix:
@@ -61,15 +60,14 @@ jobs:
         run: go vet ./...
 
       - name: Run unit tests with coverage
-        run: |
-          go test -v -race -timeout 120s -tags testing \
-            -coverprofile=coverage.out -covermode=atomic \
-            ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
+        shell: bash
+        run: go test -v -race -timeout 120s -tags testing -coverprofile=coverage.out -covermode=atomic ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
 
       - name: Run integration tests
         run: go test -v -race -timeout 300s -tags testing ./tests/integration/...
 
       - name: Generate coverage report
+        shell: bash
         run: go tool cover -func=coverage.out
 
       - name: Upload coverage report
