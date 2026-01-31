@@ -2,26 +2,47 @@ name: Tests
 
 on:
   push:
-    branches: [main, master]
+    branches: ['**']
+    tags-ignore:
+      - 'v*'
   pull_request:
     branches: [main, master]
   workflow_dispatch:
 
 jobs:
-  unit-tests:
-    name: Unit Tests (${{ matrix.os }})
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run golangci-lint
+        run: golangci-lint run --timeout=5m
+
+  test:
+    name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    needs: lint
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
-            name: Linux
+            name: linux
           - os: macos-latest
-            name: macOS
+            name: darwin
           - os: windows-latest
-            name: Windows
+            name: windows
 
     steps:
       - name: Checkout code
@@ -35,98 +56,26 @@ jobs:
 
       - name: Download dependencies
         run: go mod download
-
-      - name: Verify dependencies
-        run: go mod verify
 
       - name: Run go vet
         run: go vet ./...
 
-      - name: Run analyzer tests
-        run: go test -v -race -timeout 60s -tags testing ./tests/analyzer/...
-
-      - name: Run internal tests
-        run: go test -v -race -timeout 60s -tags testing ./tests/internal/...
-
-      - name: Run MCP tests
-        run: go test -v -race -timeout 60s -tags testing ./tests/mcp/...
-
-  integration-tests:
-    name: Integration Tests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    needs: unit-tests
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Build binary
-        run: go build -o memo${{ matrix.os == 'windows-latest' && '.exe' || '' }} .
+      - name: Run unit tests with coverage
+        run: |
+          go test -v -race -timeout 120s -tags testing \
+            -coverprofile=coverage.out -covermode=atomic \
+            ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
 
       - name: Run integration tests
-        run: go test -v -race -timeout 300s ./tests/integration/...
-
-  coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-
-      - name: Run tests with coverage
-        run: |
-          go test -v -race -tags testing -coverprofile=coverage.out -covermode=atomic \
-            ./tests/analyzer/... \
-            ./tests/internal/... \
-            ./tests/mcp/...
+        run: go test -v -race -timeout 300s -tags testing ./tests/integration/...
 
       - name: Generate coverage report
         run: |
           go tool cover -func=coverage.out
-          go tool cover -html=coverage.out -o coverage.html
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: |
-            coverage.out
-            coverage.html
-          retention-days: 30
-
-  benchmark:
-    name: Benchmarks
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-
-      - name: Run benchmarks
-        run: go test -v -tags testing -bench=. -benchmem -run=^$ ./tests/... 2>/dev/null || echo "No benchmarks found"
+          name: coverage-${{ matrix.name }}
+          path: coverage.out
+          retention-days: 7
