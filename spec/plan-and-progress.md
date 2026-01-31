@@ -2,20 +2,30 @@
 
 ## 总览
 
+### 已归档 (spec/arch/)
+
+| Spec | 描述 |
+|------|------|
+| arch-internal-submodules | arch.json internal 子模块 schema |
+| feature-auto-update | Git 仓库自动更新 |
+| feature-concurrent-analysis-guard | 并发分析保护 (sem channel) |
+| feature-mcp-default | MCP + Watcher 模式 |
+| feature-mcp-query | MCP JSON 查询接口 |
+| feature-once-mode | 单次分析模式 |
+| feature-thorough-analysis | 逐模块分析 |
+| feature-watcher-single-instance | Watcher 单实例锁 + 状态感知 |
+| fix-dyld-zombie-process | macOS 僵尸进程修复 |
+| fix-large-codebase-context-overflow | 大型仓库上下文溢出修复 |
+| fix-mcp-infinite-recursion | MCP 无限递归修复 |
+| fix-session-id-pollution | Session ID 固定化 |
+| line-buffer-design | 行缓冲输出设计 |
+
+### 待完成 (spec/)
+
 | 状态 | Spec | 描述 |
 |------|------|------|
-| ✅ | feature-mcp-default | MCP + Watcher 模式 |
-| ✅ | feature-mcp-query | MCP JSON 查询接口 |
-| ✅ | feature-once-mode | 单次分析模式 |
-| ✅ | feature-thorough-analysis | 逐模块分析 |
-| ✅ | feature-watcher-single-instance | Watcher 单实例锁 + 状态感知 |
-| ✅ | fix-dyld-zombie-process | macOS 僵尸进程修复 |
-| ✅ | fix-session-id-pollution | Session ID 固定化 |
-| ⚠️ | arch-internal-submodules | 已实现，缺测试用例 |
-| ⚠️ | fix-large-codebase-context-overflow | 已实现，缺大型仓库测试 |
-| ⚠️ | fix-mcp-infinite-recursion | 已实现，缺文档和测试 |
-| ⚠️ | line-buffer-design | 已实现，超时参数不可配置 |
-| ❌ | feature-concurrent-analysis-guard | 未实现 |
+| ❌ | feature-future-belongs-to-future | 定期 session 重建机制 |
+| ❌ | fix-empty-message-content | 空消息内容修复 |
 
 ---
 
@@ -23,37 +33,20 @@
 
 ### P0 - 功能缺失
 
-#### feature-concurrent-analysis-guard
-防止并发 Flush 导致的分析冲突。
+#### feature-future-belongs-to-future
+定期用全新 session 重建 index，避免长期运行导致的 session 状态累积和偏差。
 
-- [ ] `watcher.go`: Add `analysing sync.Mutex`
-- [ ] Test concurrent flush scenario
+- [ ] 设计评审
+- [ ] 实现 Rotator 组件
+- [ ] 测试
 
-**影响**: 当 Timer1 的分析还在进行时，Timer2 触发的 Flush 会导致并发写入 index 文件。
+#### fix-empty-message-content
+Session history 中存在空内容消息导致 API 错误。
 
----
-
-### P1 - 测试缺失
-
-#### fix-large-codebase-context-overflow
-- [ ] Test with large codebase (15000+ files)
-
-#### fix-mcp-infinite-recursion
-- [ ] Test: Verify no recursion when memo is in `~/.kimi/mcp.json`
-- [ ] Test: Verify watcher analysis still works correctly
-
-#### arch-internal-submodules
-- [ ] `testdata/` - 添加测试用例（可选）
-
----
-
-### P2 - 文档/配置
-
-#### fix-mcp-infinite-recursion
-- [ ] `README.md`: Document `.memo/mcp.json` for user customization
-
-#### line-buffer-design
-- [ ] 可配置的超时参数 (当前硬编码 500ms)
+- [ ] 复现并定位根因
+- [ ] 确定解决方案
+- [ ] 实现修复
+- [ ] 测试
 
 ---
 
@@ -64,7 +57,7 @@
 - [x] AI 分析 + 自动更新 index
 - [x] MCP 服务 (stdio)
 - [x] `--once` 单次分析模式
-- [x] `--mcp-with-watcher` 组合模式
+- [x] `--mcp` MCP 模式
 
 ### 稳定性
 - [x] Watcher 单实例锁 (`flock`)
@@ -73,6 +66,7 @@
 - [x] 本地 MCP 配置 (防递归)
 - [x] 大文件批量处理 (防 context overflow)
 - [x] 行缓冲输出 (整行日志)
+- [x] 并发分析保护 (`sem channel`)
 
 ### 修复
 - [x] dyld 僵尸进程 (rm before cp)
@@ -82,6 +76,5 @@
 
 ## 下一步计划
 
-1. **实现 concurrent-analysis-guard** — 最重要的稳定性问题
-2. **补充测试** — 大型仓库测试、递归测试
-3. **可配置超时** — line buffer timeout 可配置化
+1. **feature-future-belongs-to-future** — 定期 session 重建避免偏差累积
+2. **fix-empty-message-content** — 空消息内容修复
