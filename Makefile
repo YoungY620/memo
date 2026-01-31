@@ -28,5 +28,6 @@ install: build
 	@echo "Installed $(BINARY) to $(HOME)/.local/bin"
 
 update:
-	git pull --rebase
+	git fetch origin
+	git reset --hard origin/main
 	$(MAKE) install
