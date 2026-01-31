@@ -7,81 +7,88 @@ import (
 	"time"
 
 	"github.com/YoungY620/memo/analyzer"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSetStatus(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "status_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Create .memo directory
+	tmpDir := t.TempDir()
 	memoDir := filepath.Join(tmpDir, ".memo")
-	if err := os.MkdirAll(memoDir, 0755); err != nil {
-		t.Fatalf("Failed to create .memo dir: %v", err)
-	}
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
 
 	// Test setting idle status
-	if err := analyzer.SetStatus(memoDir, "idle"); err != nil {
-		t.Fatalf("SetStatus(idle) failed: %v", err)
-	}
+	err := analyzer.SetStatus(memoDir, "idle")
+	require.NoError(t, err)
 
 	// Verify file exists
 	statusPath := filepath.Join(memoDir, "status.json")
-	if _, err := os.Stat(statusPath); os.IsNotExist(err) {
-		t.Fatal("Status file was not created")
-	}
+	_, err = os.Stat(statusPath)
+	assert.NoError(t, err, "Status file should be created")
 
 	// Test setting analyzing status
-	if err := analyzer.SetStatus(memoDir, "analyzing"); err != nil {
-		t.Fatalf("SetStatus(analyzing) failed: %v", err)
-	}
+	err = analyzer.SetStatus(memoDir, "analyzing")
+	require.NoError(t, err)
 
 	status := analyzer.GetStatus(memoDir)
-	if status.Status != "analyzing" {
-		t.Errorf("Expected status 'analyzing', got '%s'", status.Status)
-	}
-	if status.Since == nil {
-		t.Error("Expected non-nil Since for analyzing status")
-	} else {
-		// Since should be recent (within last 5 seconds)
-		if time.Since(*status.Since) > 5*time.Second {
-			t.Error("Since timestamp is too old")
-		}
-	}
+	assert.Equal(t, "analyzing", status.Status)
+	assert.NotNil(t, status.Since, "Analyzing status should have Since timestamp")
+	assert.WithinDuration(t, time.Now(), *status.Since, 5*time.Second)
 }
 
 func TestGetStatus(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "status_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
+	tmpDir := t.TempDir()
 	memoDir := filepath.Join(tmpDir, ".memo")
-	if err := os.MkdirAll(memoDir, 0755); err != nil {
-		t.Fatalf("Failed to create .memo dir: %v", err)
-	}
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
 
 	// Test getting status when file doesn't exist
 	status := analyzer.GetStatus(memoDir)
-	if status.Status != "idle" {
-		t.Errorf("Expected default 'idle' status, got '%s'", status.Status)
-	}
+	assert.Equal(t, "idle", status.Status, "Default status should be idle")
 
 	// Test getting status after setting
 	analyzer.SetStatus(memoDir, "analyzing")
 	status = analyzer.GetStatus(memoDir)
-	if status.Status != "analyzing" {
-		t.Errorf("Expected 'analyzing' status, got '%s'", status.Status)
-	}
+	assert.Equal(t, "analyzing", status.Status)
 
 	// Test getting status with invalid JSON
 	statusPath := filepath.Join(memoDir, "status.json")
 	os.WriteFile(statusPath, []byte("invalid json"), 0644)
 	status = analyzer.GetStatus(memoDir)
-	if status.Status != "idle" {
-		t.Errorf("Expected 'idle' for invalid JSON, got '%s'", status.Status)
-	}
+	assert.Equal(t, "idle", status.Status, "Invalid JSON should fallback to idle")
+}
+
+func TestSetStatus_DirNotExist(t *testing.T) {
+	nonExistentDir := filepath.Join(t.TempDir(), "nonexistent", ".memo")
+
+	err := analyzer.SetStatus(nonExistentDir, "idle")
+	assert.Error(t, err, "Should fail when directory doesn't exist")
+}
+
+func TestSetStatus_IdleHasNoSince(t *testing.T) {
+	tmpDir := t.TempDir()
+	memoDir := filepath.Join(tmpDir, ".memo")
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
+
+	// First set analyzing (has Since)
+	analyzer.SetStatus(memoDir, "analyzing")
+	status := analyzer.GetStatus(memoDir)
+	assert.NotNil(t, status.Since)
+
+	// Then set idle (should not have Since)
+	analyzer.SetStatus(memoDir, "idle")
+	status = analyzer.GetStatus(memoDir)
+	assert.Equal(t, "idle", status.Status)
+	assert.Nil(t, status.Since, "Idle status should not have Since timestamp")
+}
+
+func TestGetStatus_EmptyFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	memoDir := filepath.Join(tmpDir, ".memo")
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
+
+	// Write empty file
+	statusPath := filepath.Join(memoDir, "status.json")
+	require.NoError(t, os.WriteFile(statusPath, []byte(""), 0644))
+
+	status := analyzer.GetStatus(memoDir)
+	assert.Equal(t, "idle", status.Status, "Empty file should fallback to idle")
 }

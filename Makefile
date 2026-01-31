@@ -34,32 +34,39 @@ update:
 
 # ============== Testing ==============
 
+# Build tag for testing (enables export_testing.go)
+TEST_TAGS=-tags testing
+
 # Run all tests
 test: test-unit test-integration
 
 # Run unit tests (fast, no external dependencies)
 test-unit:
-	go test -v -race -timeout 60s ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
+	go test -v -race -timeout 60s $(TEST_TAGS) ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
 
 # Run integration tests (may build binary, slower)
 test-integration:
-	go test -v -race -timeout 300s ./tests/integration/...
+	go test -v -race -timeout 300s $(TEST_TAGS) ./tests/integration/...
 
 # Run tests with coverage
 test-coverage:
-	go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+	go test -v -race -coverprofile=coverage.out -covermode=atomic $(TEST_TAGS) ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
 # Run specific test package
 test-analyzer:
-	go test -v -race ./tests/analyzer/...
+	go test -v -race $(TEST_TAGS) ./tests/analyzer/...
 
 test-mcp:
-	go test -v -race ./tests/mcp/...
+	go test -v -race $(TEST_TAGS) ./tests/mcp/...
 
 test-internal:
-	go test -v -race ./tests/internal/...
+	go test -v -race $(TEST_TAGS) ./tests/internal/...
+
+# Run benchmarks
+test-bench:
+	go test -v -run=^$$ -bench=. $(TEST_TAGS) ./tests/...
 
 # ============== Linting ==============
 

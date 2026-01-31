@@ -5,42 +5,38 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/YoungY620/memo/internal"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewHistoryLogger(t *testing.T) {
 	tmpDir := t.TempDir()
 	memoDir := filepath.Join(tmpDir, ".memo")
-	os.MkdirAll(memoDir, 0755)
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
 
 	logger, err := internal.NewHistoryLogger(memoDir, "test")
-	if err != nil {
-		t.Fatalf("Failed to create history logger: %v", err)
-	}
+	require.NoError(t, err)
 	defer logger.Close()
 
-	if logger == nil {
-		t.Error("Expected non-nil logger")
-	}
+	assert.NotNil(t, logger)
 
 	// History file should exist
 	historyPath := filepath.Join(memoDir, ".history")
-	if _, err := os.Stat(historyPath); os.IsNotExist(err) {
-		t.Error("History file was not created")
-	}
+	_, err = os.Stat(historyPath)
+	assert.NoError(t, err, "History file should be created")
 }
 
 func TestHistoryLogger_Log(t *testing.T) {
 	tmpDir := t.TempDir()
 	memoDir := filepath.Join(tmpDir, ".memo")
-	os.MkdirAll(memoDir, 0755)
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
 
 	logger, err := internal.NewHistoryLogger(memoDir, "test")
-	if err != nil {
-		t.Fatalf("Failed to create history logger: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Log some entries
 	logger.Log(internal.HistoryEntry{
@@ -59,50 +55,39 @@ func TestHistoryLogger_Log(t *testing.T) {
 	// Read and verify the log file
 	historyPath := filepath.Join(memoDir, ".history")
 	data, err := os.ReadFile(historyPath)
-	if err != nil {
-		t.Fatalf("Failed to read history file: %v", err)
-	}
+	require.NoError(t, err)
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 4 {
-		t.Errorf("Expected 4 log entries, got %d", len(lines))
-	}
+	assert.Len(t, lines, 4, "Should have 4 log entries")
 
 	// Verify first entry
 	var entry internal.HistoryEntry
-	if err := json.Unmarshal([]byte(lines[0]), &entry); err != nil {
-		t.Fatalf("Failed to parse log entry: %v", err)
-	}
+	require.NoError(t, json.Unmarshal([]byte(lines[0]), &entry))
 
-	if entry.Type != "request" {
-		t.Errorf("Expected type 'request', got '%s'", entry.Type)
-	}
-	if entry.Source != "test" {
-		t.Errorf("Expected source 'test', got '%s'", entry.Source)
-	}
-	if entry.Seq != 1 {
-		t.Errorf("Expected seq 1, got %d", entry.Seq)
-	}
+	assert.Equal(t, "request", entry.Type)
+	assert.Equal(t, "test", entry.Source)
+	assert.Equal(t, int64(1), entry.Seq)
 }
 
 func TestHistoryLogger_NilSafe(t *testing.T) {
 	var logger *internal.HistoryLogger
 
 	// These should not panic
-	logger.Log(internal.HistoryEntry{Type: "test"})
-	logger.LogInfo("test")
-	logger.LogDebug("test")
-	logger.LogError("test", nil)
-	logger.Close()
+	assert.NotPanics(t, func() {
+		logger.Log(internal.HistoryEntry{Type: "test"})
+		logger.LogInfo("test")
+		logger.LogDebug("test")
+		logger.LogError("test", nil)
+		logger.Close()
+	})
 }
 
 func TestHistoryLogger_ErrorWithErr(t *testing.T) {
 	tmpDir := t.TempDir()
 	memoDir := filepath.Join(tmpDir, ".memo")
-	os.MkdirAll(memoDir, 0755)
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
 
 	logger, _ := internal.NewHistoryLogger(memoDir, "test")
-	defer logger.Close()
 
 	// Log error with actual error
 	logger.LogError("something failed", os.ErrNotExist)
@@ -112,7 +97,105 @@ func TestHistoryLogger_ErrorWithErr(t *testing.T) {
 	historyPath := filepath.Join(memoDir, ".history")
 	data, _ := os.ReadFile(historyPath)
 
-	if !strings.Contains(string(data), "file does not exist") {
-		t.Error("Error message should contain the error text")
+	assert.Contains(t, string(data), "file does not exist")
+}
+
+func TestNewHistoryLogger_DirNotExist(t *testing.T) {
+	nonExistentDir := filepath.Join(t.TempDir(), "nonexistent", ".memo")
+
+	logger, err := internal.NewHistoryLogger(nonExistentDir, "test")
+	assert.Error(t, err, "Should fail when directory doesn't exist")
+	assert.Nil(t, logger)
+}
+
+func TestHistoryLogger_Concurrent(t *testing.T) {
+	tmpDir := t.TempDir()
+	memoDir := filepath.Join(tmpDir, ".memo")
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
+
+	logger, err := internal.NewHistoryLogger(memoDir, "test")
+	require.NoError(t, err)
+	defer logger.Close()
+
+	// Concurrent writes
+	var wg sync.WaitGroup
+	numGoroutines := 10
+	numLogs := 100
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < numLogs; j++ {
+				logger.LogInfo("message from goroutine %d, log %d", id, j)
+			}
+		}(i)
 	}
+	wg.Wait()
+	logger.Close()
+
+	// Verify all entries were written
+	historyPath := filepath.Join(memoDir, ".history")
+	data, err := os.ReadFile(historyPath)
+	require.NoError(t, err)
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	assert.Equal(t, numGoroutines*numLogs, len(lines), "All log entries should be written")
+
+	// Verify each line is valid JSON
+	for i, line := range lines {
+		var entry internal.HistoryEntry
+		err := json.Unmarshal([]byte(line), &entry)
+		assert.NoError(t, err, "Line %d should be valid JSON", i)
+	}
+}
+
+func TestHistoryLogger_SeqMonotonic(t *testing.T) {
+	tmpDir := t.TempDir()
+	memoDir := filepath.Join(tmpDir, ".memo")
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
+
+	logger, err := internal.NewHistoryLogger(memoDir, "test")
+	require.NoError(t, err)
+
+	// Log multiple entries
+	for i := 0; i < 10; i++ {
+		logger.LogInfo("message %d", i)
+	}
+	logger.Close()
+
+	// Read and verify sequence numbers
+	historyPath := filepath.Join(memoDir, ".history")
+	data, err := os.ReadFile(historyPath)
+	require.NoError(t, err)
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	var lastSeq int64 = 0
+
+	for i, line := range lines {
+		var entry internal.HistoryEntry
+		require.NoError(t, json.Unmarshal([]byte(line), &entry))
+
+		assert.Greater(t, entry.Seq, lastSeq, "Seq should be monotonically increasing at line %d", i)
+		lastSeq = entry.Seq
+	}
+}
+
+func TestHistoryLogger_LogInfoFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	memoDir := filepath.Join(tmpDir, ".memo")
+	require.NoError(t, os.MkdirAll(memoDir, 0755))
+
+	logger, err := internal.NewHistoryLogger(memoDir, "test")
+	require.NoError(t, err)
+
+	// Test formatted logging
+	logger.LogInfo("Value: %d, String: %s", 42, "hello")
+	logger.Close()
+
+	historyPath := filepath.Join(memoDir, ".history")
+	data, err := os.ReadFile(historyPath)
+	require.NoError(t, err)
+
+	assert.Contains(t, string(data), "Value: 42, String: hello")
 }

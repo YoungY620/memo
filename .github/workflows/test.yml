@@ -3,17 +3,8 @@ name: Tests
 on:
   push:
     branches: [main, master]
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - '.github/workflows/test.yml'
   pull_request:
     branches: [main, master]
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
   workflow_dispatch:
 
 jobs:
@@ -52,13 +43,13 @@ jobs:
         run: go vet ./...
 
       - name: Run analyzer tests
-        run: go test -v -race -timeout 60s ./tests/analyzer/...
+        run: go test -v -race -timeout 60s -tags testing ./tests/analyzer/...
 
       - name: Run internal tests
-        run: go test -v -race -timeout 60s ./tests/internal/...
+        run: go test -v -race -timeout 60s -tags testing ./tests/internal/...
 
       - name: Run MCP tests
-        run: go test -v -race -timeout 60s ./tests/mcp/...
+        run: go test -v -race -timeout 60s -tags testing ./tests/mcp/...
 
   integration-tests:
     name: Integration Tests (${{ matrix.os }})
@@ -104,7 +95,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          go test -v -race -coverprofile=coverage.out -covermode=atomic \
+          go test -v -race -tags testing -coverprofile=coverage.out -covermode=atomic \
             ./tests/analyzer/... \
             ./tests/internal/... \
             ./tests/mcp/...
@@ -138,4 +129,4 @@ jobs:
           cache: true
 
       - name: Run benchmarks
-        run: go test -v -bench=. -benchmem -run=^$ ./tests/... 2>/dev/null || echo "No benchmarks found"
+        run: go test -v -tags testing -bench=. -benchmem -run=^$ ./tests/... 2>/dev/null || echo "No benchmarks found"

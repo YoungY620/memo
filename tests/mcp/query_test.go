@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/YoungY620/memo/mcp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParsePath(t *testing.T) {
@@ -195,5 +197,121 @@ func TestGetValue(t *testing.T) {
 				t.Errorf("GetValue(%q) = %v, want %v", tt.path, result.Value, tt.want)
 			}
 		})
+	}
+}
+
+func TestListKeys_FileNotExist(t *testing.T) {
+	nonExistentDir := filepath.Join(t.TempDir(), "nonexistent", "index")
+
+	_, err := mcp.ListKeys(nonExistentDir, "[arch]")
+	assert.Error(t, err, "Should fail when file doesn't exist")
+}
+
+func TestGetValue_FileNotExist(t *testing.T) {
+	nonExistentDir := filepath.Join(t.TempDir(), "nonexistent", "index")
+
+	_, err := mcp.GetValue(nonExistentDir, "[arch][modules]")
+	assert.Error(t, err, "Should fail when file doesn't exist")
+}
+
+func TestListKeys_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	indexDir := filepath.Join(dir, ".memo", "index")
+	require.NoError(t, os.MkdirAll(indexDir, 0755))
+
+	// Write invalid JSON
+	require.NoError(t, os.WriteFile(filepath.Join(indexDir, "arch.json"), []byte("invalid json"), 0644))
+
+	_, err := mcp.ListKeys(indexDir, "[arch]")
+	assert.Error(t, err, "Should fail for invalid JSON")
+}
+
+func TestGetValue_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	indexDir := filepath.Join(dir, ".memo", "index")
+	require.NoError(t, os.MkdirAll(indexDir, 0755))
+
+	// Write invalid JSON
+	require.NoError(t, os.WriteFile(filepath.Join(indexDir, "arch.json"), []byte("invalid json"), 0644))
+
+	_, err := mcp.GetValue(indexDir, "[arch]")
+	assert.Error(t, err, "Should fail for invalid JSON")
+}
+
+func TestDeepNestedPath(t *testing.T) {
+	dir := t.TempDir()
+	indexDir := filepath.Join(dir, ".memo", "index")
+	require.NoError(t, os.MkdirAll(indexDir, 0755))
+
+	// Create deeply nested structure
+	content := `{
+		"issues": [{
+			"tags": ["bug"],
+			"title": "Fix",
+			"description": "desc",
+			"locations": [{
+				"file": "main.go",
+				"keyword": "TODO",
+				"line": 10
+			}]
+		}]
+	}`
+	require.NoError(t, os.WriteFile(filepath.Join(indexDir, "issues.json"), []byte(content), 0644))
+
+	// Test deep path
+	result, err := mcp.GetValue(indexDir, "[issues][issues][0][locations][0][file]")
+	require.NoError(t, err)
+	assert.Equal(t, `"main.go"`, result.Value)
+
+	// Test nested object
+	result, err = mcp.GetValue(indexDir, "[issues][issues][0][locations][0]")
+	require.NoError(t, err)
+	assert.Contains(t, result.Value, "main.go")
+	assert.Contains(t, result.Value, "TODO")
+}
+
+func TestListKeys_EmptyArray(t *testing.T) {
+	dir := t.TempDir()
+	indexDir := filepath.Join(dir, ".memo", "index")
+	require.NoError(t, os.MkdirAll(indexDir, 0755))
+
+	content := `{"modules": [], "relationships": ""}`
+	require.NoError(t, os.WriteFile(filepath.Join(indexDir, "arch.json"), []byte(content), 0644))
+
+	result, err := mcp.ListKeys(indexDir, "[arch][modules]")
+	require.NoError(t, err)
+	assert.Equal(t, "list", result.Type)
+	assert.Equal(t, 0, result.Length)
+}
+
+func TestListKeys_EmptyObject(t *testing.T) {
+	dir := t.TempDir()
+	indexDir := filepath.Join(dir, ".memo", "index")
+	require.NoError(t, os.MkdirAll(indexDir, 0755))
+
+	content := `{"modules": [{}], "relationships": ""}`
+	require.NoError(t, os.WriteFile(filepath.Join(indexDir, "arch.json"), []byte(content), 0644))
+
+	result, err := mcp.ListKeys(indexDir, "[arch][modules][0]")
+	require.NoError(t, err)
+	assert.Equal(t, "dict", result.Type)
+	assert.Empty(t, result.Keys)
+}
+
+// Benchmark tests
+func BenchmarkParsePath(b *testing.B) {
+	paths := []string{
+		"[arch]",
+		"[arch][modules]",
+		"[arch][modules][0]",
+		"[arch][modules][0][name]",
+		"[issues][issues][0][locations][0][file]",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, p := range paths {
+			mcp.ParsePath(p)
+		}
 	}
 }
