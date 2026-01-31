@@ -1,10 +1,13 @@
+//go:build windows
+
 package analyzer
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 const lockFileName = "watcher.lock"
@@ -19,8 +22,18 @@ func TryLock(memoDir string) (*os.File, error) {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}
 
-	// Try non-blocking exclusive lock
-	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	// Try to lock the file exclusively with LOCKFILE_FAIL_IMMEDIATELY
+	// This is the Windows equivalent of LOCK_EX|LOCK_NB on Unix
+	handle := windows.Handle(f.Fd())
+	overlapped := &windows.Overlapped{}
+	err = windows.LockFileEx(
+		handle,
+		windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY,
+		0,
+		1, // Lock 1 byte
+		0,
+		overlapped,
+	)
 	if err != nil {
 		f.Close()
 		return nil, fmt.Errorf("another watcher is already running on this directory")
@@ -38,7 +51,10 @@ func TryLock(memoDir string) (*os.File, error) {
 // Unlock releases the lock and closes the file
 func Unlock(f *os.File) {
 	if f != nil {
-		syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		handle := windows.Handle(f.Fd())
+		overlapped := &windows.Overlapped{}
+		// Ignore unlock error - file close will release the lock anyway
+		windows.UnlockFileEx(handle, 0, 1, 0, overlapped)
 		f.Close()
 	}
 }

@@ -1,9 +1,11 @@
-package mcp
+package mcp_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/YoungY620/memo/mcp"
 )
 
 func TestParsePath(t *testing.T) {
@@ -43,7 +45,7 @@ func TestParsePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			file, segs, err := ParsePath(tt.path)
+			file, segs, err := mcp.ParsePath(tt.path)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParsePath(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
 				return
@@ -62,7 +64,7 @@ func TestParsePath(t *testing.T) {
 
 func TestParsePathEscaping(t *testing.T) {
 	// Test that escaped brackets are handled correctly
-	_, segs, err := ParsePath("[arch][key\\[0\\]]")
+	_, segs, err := mcp.ParsePath("[arch][key\\[0\\]]")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,7 +73,7 @@ func TestParsePathEscaping(t *testing.T) {
 	}
 
 	// Test escaped backslash
-	_, segs, err = ParsePath("[arch][path\\\\to\\\\file]")
+	_, segs, err = mcp.ParsePath("[arch][path\\\\to\\\\file]")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -83,7 +85,7 @@ func TestParsePathEscaping(t *testing.T) {
 func TestKeyValidation(t *testing.T) {
 	// Key too long
 	longKey := "[arch][" + string(make([]byte, 101)) + "]"
-	_, _, err := ParsePath(longKey)
+	_, _, err := mcp.ParsePath(longKey)
 	if err == nil {
 		t.Error("expected error for long key")
 	}
@@ -147,7 +149,7 @@ func TestListKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ListKeys(indexDir, tt.path)
+			result, err := mcp.ListKeys(indexDir, tt.path)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ListKeys(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
 				return
@@ -184,7 +186,7 @@ func TestGetValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := GetValue(indexDir, tt.path)
+			result, err := mcp.GetValue(indexDir, tt.path)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetValue(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
 				return
