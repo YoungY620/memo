@@ -2,6 +2,28 @@
 
 AI-powered codebase memory for coding agents. Watches file changes and maintains `.memo` documentation automatically.
 
+## Why Memo?
+
+Vibe coding with AI agents across multiple sessions evolves fast—too fast for humans to keep up. Projects spiral out of control due to lack of **global consistency**: models can't read the entire codebase in one pass, and neither can humans.
+
+Inspired by traditional code indexing, Memo maintains a semantic index specifically for coding agents, capturing architecture and key decisions. This enables:
+
+- **"Summarize this repo"** — No need to read every file. Memo provides instant context.
+- **Preserve design decisions** — Trade-offs and constraints are recorded once, no need to repeat every session.
+- **Holistic refactoring** — After modifying a module, agents can update related code across the project, even connections that static analysis can't detect.
+- **Beyond coding: Large document navigation** — Find related content without scanning everything.
+
+## Benchmark
+
+Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instances, limited by time):
+
+[performance_analysis_final.png](performance_analysis_final.png)
+
+**Key findings:**
+- **4× pass rate improvement** (4.3% → 17.4%)
+- **15% faster inference** (212s → 180s per instance)
+- Memo index generation is one-time cost, amortized across tasks
+
 ## Installation
 
 ### Linux / macOS
@@ -27,28 +49,6 @@ git clone https://github.com/YoungY620/memo.git
 cd memo
 make install  # installs to ~/.local/bin
 ```
-
-## Why Memo?
-
-Vibe coding with AI agents across multiple sessions evolves fast—too fast for humans to keep up. Projects spiral out of control due to lack of **global consistency**: models can't read the entire codebase in one pass, and neither can humans.
-
-Inspired by traditional code indexing, Memo maintains a semantic index specifically for coding agents, capturing architecture and key decisions. This enables:
-
-- **"Summarize this repo"** — No need to read every file. Memo provides instant context.
-- **Preserve design decisions** — Trade-offs and constraints are recorded once, no need to repeat every session.
-- **Holistic refactoring** — After modifying a module, agents can update related code across the project, even connections that static analysis can't detect.
-- **Beyond coding: Large document navigation** — Find related content without scanning everything.
-
-## Benchmark
-
-Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instances, limited by time):
-
-[performance_analysis_final.png](performance_analysis_final.png)
-
-**Key findings:**
-- **4× pass rate improvement** (4.3% → 17.4%)
-- **15% faster inference** (212s → 180s per instance)
-- Memo index generation is one-time cost, amortized across tasks
 
 ## Usage
 
