@@ -190,6 +190,30 @@
     },
     {
       "type": "callback",
+      "name": "internal.LogError(format string, v ...any)",
+      "params": "format: Printf format; v: args",
+      "description": "Logs error message (level >= 0). Also writes to historyLog if initialized."
+    },
+    {
+      "type": "callback",
+      "name": "internal.LogWarning(format string, v ...any)",
+      "params": "format: Printf format; v: args",
+      "description": "Logs warning message (level >= 1). Used for non-fatal issues like broken symlinks."
+    },
+    {
+      "type": "callback",
+      "name": "internal.LogInfo(format string, v ...any)",
+      "params": "format: Printf format; v: args",
+      "description": "Logs info message (level >= 2). Used for general progress info."
+    },
+    {
+      "type": "callback",
+      "name": "internal.LogDebug(format string, v ...any)",
+      "params": "format: Printf format; v: args",
+      "description": "Logs debug message (level >= 3). Detailed debugging output."
+    },
+    {
+      "type": "callback",
       "name": "internal.NewLineBuffer(timeout time.Duration) *LineBuffer",
       "params": "timeout: flush timeout for partial lines",
       "description": "Creates buffer for clean streaming output. Flushes complete lines immediately."

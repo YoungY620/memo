@@ -58,8 +58,8 @@
           },
           {
             "name": "watcher",
-            "description": "Filesystem watcher using fsnotify. Debounce/max-wait batching, concurrent analysis guard via semaphore.",
-            "interfaces": "NewWatcher(), ScanAll(), Flush(), Run(), Close(), add(), ignored()"
+            "description": "Filesystem watcher using fsnotify. Debounce/max-wait batching, concurrent analysis guard via semaphore. Robust error handling with describePathError() for broken symlinks and permission issues.",
+            "interfaces": "NewWatcher(), ScanAll(), Flush(), Run(), Close(), add(), ignored(), describePathError()"
           },
           {
             "name": "validator",
@@ -107,14 +107,14 @@
     },
     {
       "name": "internal",
-      "description": "Shared utilities package. Logging with levels, LineBuffer for streaming output, HistoryLogger for debugging, auto-update checker.",
+      "description": "Shared utilities package. Logging with 4 levels (error/warning/info/debug), LineBuffer for streaming output, HistoryLogger for debugging, auto-update checker.",
       "interfaces": "SetLogLevel(), LogError/LogWarning/LogInfo/LogDebug(). NewLineBuffer(timeout), Write(), Flush(). NewHistoryLogger(memoDir, source), Log(), Close(). CheckUpdate(version), CheckUpdateAsync(version).",
       "internal": {
         "submodules": [
           {
             "name": "log",
-            "description": "Logging with 4 levels (error/warning/info/debug). Global historyLog integration. LineBuffer for clean streaming output.",
-            "interfaces": "SetLogLevel(), Log*() functions. InitHistoryLogger(), CloseHistoryLogger(). NewLineBuffer(), Write(), Flush(force)"
+            "description": "Logging with 4 levels (error=0, warning=1, info=2, debug=3). Global historyLog integration. LineBuffer for clean streaming output.",
+            "interfaces": "SetLogLevel(), LogError/LogWarning/LogInfo/LogDebug(). InitHistoryLogger(), CloseHistoryLogger(). NewLineBuffer(), Write(), Flush(force)"
           },
           {
             "name": "history",

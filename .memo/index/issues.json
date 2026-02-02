@@ -1,83 +1,61 @@
 {
   "issues": [
     {
-      "title": "Deprecated root-level Go files should be deleted",
-      "description": "The codebase has been refactored to a 4-package architecture (cmd/, analyzer/, mcp/, internal/) but old root-level .go files still exist: analyser.go, config.go, lock.go, log.go, status.go, validator.go, watcher.go. These are dead code from the flat structure and should be removed. Only main.go should remain at root.",
-      "severity": "medium",
-      "tags": ["cleanup", "dead-code", "refactoring"],
-      "locations": [
-        {"file": "analyser.go", "keyword": "deprecated", "line": 1},
-        {"file": "config.go", "keyword": "deprecated", "line": 1},
-        {"file": "lock.go", "keyword": "deprecated", "line": 1},
-        {"file": "log.go", "keyword": "deprecated", "line": 1},
-        {"file": "status.go", "keyword": "deprecated", "line": 1},
-        {"file": "validator.go", "keyword": "deprecated", "line": 1},
-        {"file": "watcher.go", "keyword": "deprecated", "line": 1}
-      ]
-    },
-    {
+      "tags": ["todo", "missing-feature"],
       "title": "--mcp-with-watcher flag not implemented",
       "description": "The spec describes a flag to run MCP server alongside watcher in a single process, but this is not implemented. Currently watch and mcp are separate commands that cannot run together. This would be useful for editors that want both real-time updates and MCP queries.",
-      "severity": "low",
-      "tags": ["missing-feature", "spec-mismatch"],
       "locations": [
         {"file": "cmd/watch.go", "keyword": "runWatch", "line": 35},
         {"file": "cmd/mcp.go", "keyword": "mcpCmd", "line": 15}
       ]
     },
     {
-      "title": "LineBuffer timeout is hardcoded to 500ms",
-      "description": "The LineBuffer in internal/log.go has a hardcoded 500ms timeout for flushing partial lines. The spec mentions this should be configurable but there's no mechanism to change it. For slow terminals or high-latency output, this could cause issues.",
-      "severity": "low",
-      "tags": ["hardcoded-config", "configurability"],
-      "locations": [
-        {"file": "internal/log.go", "keyword": "500", "line": 85}
-      ]
-    },
-    {
+      "tags": ["todo", "roadmap"],
       "title": "Periodic index rebuild (Future Belongs to Future) not implemented",
       "description": "The spec's Roadmap mentions 'Future Belongs to Future: Periodic index rebuild with fresh sessions for consistency.' This feature is not implemented - once the session ID is generated it's reused forever, which could lead to context drift over time.",
-      "severity": "low",
-      "tags": ["missing-feature", "roadmap"],
       "locations": [
-        {"file": "analyzer/analyser.go", "keyword": "generateSessionID", "line": 180}
+        {"file": "analyzer/analyser.go", "keyword": "generateSessionID", "line": 50}
       ]
     },
     {
-      "title": "Session ID reuse may cause context drift",
-      "description": "The generateSessionID() function creates a deterministic session ID from the workDir hash. This means all analyses reuse the same kimi-agent-sdk session. While this enables context sharing, it also means the AI's understanding may drift from reality if the codebase changes significantly between sessions.",
-      "severity": "low",
-      "tags": ["design-concern", "ai-context"],
+      "tags": ["design-decision"],
+      "title": "Session ID deterministic from workDir hash",
+      "description": "The generateSessionID() function creates a deterministic session ID from workDir SHA256 hash (memo-<8-hex-chars>). This enables session reuse across analyses for context continuity, but may cause AI context drift if codebase changes significantly.",
       "locations": [
         {"file": "analyzer/analyser.go", "keyword": "sessionID", "line": 25}
       ]
     },
     {
+      "tags": ["robustness"],
       "title": "No graceful shutdown handling in watcher",
       "description": "The watcher's Run() loop exits on fsnotify errors but doesn't handle SIGINT/SIGTERM gracefully. The status might remain 'analyzing' in status.json if the process is killed during analysis.",
-      "severity": "low",
-      "tags": ["robustness", "signal-handling"],
       "locations": [
-        {"file": "analyzer/watcher.go", "keyword": "Run", "line": 95},
+        {"file": "analyzer/watcher.go", "keyword": "Run", "line": 130},
         {"file": "analyzer/status.go", "keyword": "SetStatus", "line": 20}
       ]
     },
     {
+      "tags": ["todo", "optimization"],
       "title": "History log file grows unbounded",
       "description": "The .memo/.history JSONL file is append-only with no rotation or size limit. For long-running watcher processes with frequent changes, this file could grow very large.",
-      "severity": "low",
-      "tags": ["resource-leak", "logging"],
       "locations": [
         {"file": "internal/history.go", "keyword": "Log", "line": 45}
       ]
     },
     {
+      "tags": ["compromise"],
       "title": "Ignore pattern matching is simplistic",
-      "description": "The ignored() function in watcher.go does simple string prefix matching (strings.HasPrefix). This doesn't support full gitignore glob patterns like **/*.log or negation patterns. The comment suggests merging with .gitignore but the matching is basic.",
-      "severity": "low",
-      "tags": ["incomplete-feature", "gitignore"],
+      "description": "The ignored() function in watcher.go does simple string matching (HasPrefix for *.ext, Contains for paths). This doesn't support full gitignore glob patterns like **/*.log or negation patterns.",
       "locations": [
-        {"file": "analyzer/watcher.go", "keyword": "ignored", "line": 150}
+        {"file": "analyzer/watcher.go", "keyword": "ignored", "line": 116}
+      ]
+    },
+    {
+      "tags": ["design-decision", "robustness"],
+      "title": "Watcher gracefully handles filesystem errors",
+      "description": "The analyzer/watcher.go has describePathError() helper that extracts detailed info from fs.PathError (op, path, reason). This handles broken symlinks, permission denied, etc. with warnings instead of failures.",
+      "locations": [
+        {"file": "analyzer/watcher.go", "keyword": "describePathError", "line": 29}
       ]
     }
   ]

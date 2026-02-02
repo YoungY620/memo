@@ -34,6 +34,11 @@
       "title": "MCP Path Query Security",
       "tags": ["security", "validation", "whitelist", "path-traversal"],
       "content": "MCP query parser has security controls: allowedFiles whitelist (arch/interface/stories/issues), 100-char key limit, control character rejection, no path traversal. Invalid paths return clear error messages.\n\nHappy path:\n1. mcp/query.go: ParsePath() extracts file name\n2. Validate against allowedFiles whitelist\n3. validateKey() checks length and chars\n4. Return structured PathSegment array\n5. On invalid: return descriptive error"
+    },
+    {
+      "title": "Cross-platform Filesystem Error Handling",
+      "tags": ["cross-platform", "error-handling", "watcher"],
+      "content": "Watcher handles filesystem errors gracefully across platforms (Windows, macOS, Linux). Uses io/fs package for cross-platform error detection (ErrNotExist, ErrPermission, etc.). When encountering errors like broken symlinks or permission issues, logs warning with detailed info (op, path, reason) and continues rather than failing.\n\nHappy path:\n1. analyzer/watcher.go: watchAll() walks directory tree\n2. On error: describePathError() extracts PathError details\n3. Uses errors.Is() with fs.ErrNotExist, fs.ErrPermission etc.\n4. LogWarning() with op, path, reason\n5. Continue processing other files/directories"
     }
   ]
 }
