@@ -167,7 +167,7 @@ However, we can **prevent the problem from occurring** by ensuring the old binar
       cp $(BINARY) $(HOME)/.local/bin/$(BINARY)
       @echo "Installed $(BINARY) to $(HOME)/.local/bin"
 ```
-
+ 
 ## Troubleshooting
 
 ### Detecting Zombie Processes

@@ -2,29 +2,29 @@
   "modules": [
     {
       "name": "main",
-      "description": "Application entry point. Sets version and delegates to cmd.Execute() for CLI handling.",
-      "interfaces": "Receives Version from build flags, calls cmd.SetVersion() and cmd.Execute(). Exit on error."
+      "description": "Application entry point. Sets version from build flags and delegates to cobra CLI.",
+      "interfaces": "Calls cmd.SetVersion() and cmd.Execute(). Exit code 1 on error."
     },
     {
       "name": "cmd",
-      "description": "CLI command layer using Cobra framework. Defines three commands: watch (default), scan, and mcp. Handles configuration loading, directory initialization, and orchestrates analyzer/mcp packages.",
-      "interfaces": "Execute() runs the root command. SetVersion(v) sets version. Exports Config types for YAML parsing.",
+      "description": "CLI command layer using Cobra framework. Defines three subcommands: watch (default), scan, and mcp. Handles configuration loading, directory initialization, and orchestrates analyzer/mcp packages.",
+      "interfaces": "Execute() runs root command. SetVersion(v) sets version. Exports Config types for YAML parsing. Uses analyzer and mcp packages.",
       "internal": {
         "submodules": [
           {
             "name": "root",
-            "description": "Root command definition with global flags (--path, --log-level, --version)",
-            "interfaces": "rootCmd with PersistentFlags, resolveWorkDir() helper"
+            "description": "Root cobra command with global flags (--path, --log-level, --version)",
+            "interfaces": "rootCmd, Execute(), SetVersion(), resolveWorkDir()"
           },
           {
             "name": "watch",
             "description": "Watch mode - monitors file changes continuously, updates index on change",
-            "interfaces": "watchCmd with --config, --skip-scan flags. Calls analyzer.NewWatcher, analyzer.NewAnalyser"
+            "interfaces": "watchCmd with --config, --skip-scan flags. Calls analyzer.NewWatcher, analyzer.NewAnalyser, analyzer.PrintBanner"
           },
           {
             "name": "scan",
             "description": "Scan mode - analyzes all files once, updates index, then exits",
-            "interfaces": "scanCmd with --config flag. Same flow as watch but exits after Flush()"
+            "interfaces": "scanCmd with --config flag. Same flow as watch but calls watcher.Flush() and exits"
           },
           {
             "name": "mcp",
@@ -42,7 +42,7 @@
             "interfaces": "initIndex(indexDir) creates .memo/index/*.json, mcp.json, .gitignore. loadConfigAndSetup() loads config and sets log level"
           }
         ],
-        "relationships": "root → watch/scan/mcp commands → config + common utilities"
+        "relationships": "root → watch/scan/mcp commands → config + common utilities → analyzer/mcp packages"
       }
     },
     {
@@ -54,7 +54,7 @@
           {
             "name": "analyser",
             "description": "AI-powered analysis using kimi-agent-sdk. Batches files, sends prompts, validates output with retry loop (max 5 attempts).",
-            "interfaces": "NewAnalyser(), Analyse(ctx, files), analyseBatch(), runPrompt(). Uses embedded prompts/*.md"
+            "interfaces": "NewAnalyser(), Analyse(), analyseBatch(), runPrompt(). Uses embedded prompts/*.md"
           },
           {
             "name": "watcher",
@@ -69,7 +69,7 @@
           {
             "name": "lock",
             "description": "Single-instance lock using flock (Unix) or LockFileEx (Windows)",
-            "interfaces": "TryLock(memoDir) → *os.File, Unlock(f). Platform-specific: lock_unix.go, lock_windows.go"
+            "interfaces": "TryLock(memoDir) → *os.File, Unlock(f). Platform-specific via build tags"
           },
           {
             "name": "status",
@@ -79,10 +79,10 @@
           {
             "name": "banner",
             "description": "Startup banner with ASCII art, version, greeting, update notice. Adapts to terminal width.",
-            "interfaces": "PrintBanner(BannerOptions), UpdateInfo struct"
+            "interfaces": "PrintBanner(BannerOptions). BannerOptions has WorkDir, Version, UpdateInfo"
           }
         ],
-        "relationships": "analyser uses watcher for file events, validator for output checking, status for progress tracking. lock ensures single instance. banner for UX."
+        "relationships": "watcher detects changes → analyser processes batches → validator checks output. lock ensures single instance. status signals progress to MCP. banner displays on startup."
       }
     },
     {
@@ -102,18 +102,18 @@
             "interfaces": "ParsePath(path) → file, segments, err. ListKeys(), GetValue(). traverse() navigates JSON. validateKey() security check."
           }
         ],
-        "relationships": "server → query for tool calls. server reads status.json to add stale-data warnings."
+        "relationships": "server receives JSON-RPC → dispatches to query functions → returns results. Checks status.json for stale-data warnings."
       }
     },
     {
       "name": "internal",
       "description": "Shared utilities package. Logging with levels, LineBuffer for streaming output, HistoryLogger for debugging, auto-update checker.",
-      "interfaces": "SetLogLevel(), LogError/LogNotice/LogInfo/LogDebug(). NewLineBuffer(timeout), Write(), Flush(). NewHistoryLogger(), Log(), LogError/Info/Debug(), Close(). CheckUpdate(version), CheckUpdateAsync(version).",
+      "interfaces": "SetLogLevel(), LogError/LogWarning/LogInfo/LogDebug(). NewLineBuffer(timeout), Write(), Flush(). NewHistoryLogger(memoDir, source), Log(), Close(). CheckUpdate(version), CheckUpdateAsync(version).",
       "internal": {
         "submodules": [
           {
             "name": "log",
-            "description": "Logging with 4 levels (error/notice/info/debug). Global historyLog integration. LineBuffer for clean streaming output.",
+            "description": "Logging with 4 levels (error/warning/info/debug). Global historyLog integration. LineBuffer for clean streaming output.",
             "interfaces": "SetLogLevel(), Log*() functions. InitHistoryLogger(), CloseHistoryLogger(). NewLineBuffer(), Write(), Flush(force)"
           },
           {
@@ -124,12 +124,12 @@
           {
             "name": "updater",
             "description": "Auto-update checker via GitHub API. Async check with 2s timeout, semver comparison.",
-            "interfaces": "CheckUpdate(currentVersion), CheckUpdateAsync(version). UpdateInfo struct with LatestVersion, UpdateCommand"
+            "interfaces": "CheckUpdate(currentVersion), CheckUpdateAsync(version). Returns UpdateInfo with LatestVersion, UpdateCommand"
           }
         ],
-        "relationships": "log uses history for persistent logging. updater is standalone."
+        "relationships": "log uses history for persistent logging. updater is standalone, called from cmd/watch and cmd/scan."
       }
     }
   ],
-  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> cmd\n  cmd --> analyzer\n  cmd --> mcp\n  cmd --> internal\n  analyzer --> internal\n  mcp --> internal\n  analyzer --> kimi-agent-sdk\n  analyzer --> fsnotify\n  analyzer --> gojsonschema\n  mcp --> .memo/index\n```\n\n## Data Flow\n\n1. **Watch/Scan mode**: cmd/watch.go or cmd/scan.go → analyzer.Watcher → analyzer.Analyser → kimi-agent-sdk → .memo/index/*.json\n2. **MCP mode**: cmd/mcp.go → mcp.Server → mcp.query → .memo/index/*.json\n\n## Directory Structure\n\n- `cmd/` - CLI commands (watch, scan, mcp)\n- `analyzer/` - Core analysis logic\n- `mcp/` - MCP server\n- `internal/` - Shared utilities\n- `analyzer/prompts/` - Embedded AI prompt templates\n- `tests/` - Test files organized by package"
+  "relationships": "main → cmd.Execute() → watch/scan/mcp commands.\n\nWatch/Scan mode: cmd → analyzer.Watcher → analyzer.Analyser → kimi-agent-sdk → .memo/index/*.json\n\nMCP mode: cmd → mcp.Serve() → mcp.Server → mcp.query → .memo/index/*.json\n\nShared: internal/log, internal/history used by all packages. internal/updater used by cmd."
 }

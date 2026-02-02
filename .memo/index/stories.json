@@ -1,39 +1,39 @@
 {
   "stories": [
     {
-      "title": "Watch Mode - Continuous File Monitoring",
-      "tags": ["user-story", "watch", "main-flow"],
-      "content": "Developer runs `memo` or `memo watch` to continuously monitor file changes. The flow: main.go calls cmd.Execute() which dispatches to watchCmd (default). runWatch() validates MOONSHOT_API_KEY exists, starts background update check via internal.CheckUpdateAsync(), loads config.yaml and merges .gitignore patterns. It acquires an exclusive lock via analyzer.TryLock(), creates .memo/index/*.json if missing, then creates Analyser and Watcher. Unless --skip-scan is set, it calls watcher.ScanAll() for initial full scan. PrintBanner() displays ASCII art, version, and update notice. watcher.Run(ctx) starts the fsnotify event loop. On file changes, debounce timer starts; after debounce (or maxWait), the semaphore guard ensures one analysis at a time, then calls onChange(files). Analyser.Analyse() batches files, sends to Kimi API, validates JSON output (retry up to 5x), and writes updated index files. Loop continues until Ctrl+C."
+      "title": "Watch Mode: Continuous File Monitoring",
+      "tags": ["watch", "fsnotify", "debounce", "analysis", "default-command"],
+      "content": "Developer runs 'memo' or 'memo watch' in project root. memo loads config, acquires exclusive lock, checks for updates, scans all files (unless --skip-scan), then enters fsnotify watch loop. On file changes, debounces for 30s (configurable), batches files, and sends to AI for analysis. Results are validated against JSON schemas (retry up to 5x on failure), then written to .memo/index/*.json.\n\nHappy path:\n1. main.go: cmd.Execute()\n2. cmd/root.go: rootCmd dispatches to watchCmd (default)\n3. cmd/watch.go: runWatch() acquires lock via analyzer.TryLock()\n4. cmd/common.go: initIndex() creates .memo/index with empty JSON files\n5. cmd/config.go: LoadConfig() reads config.yaml with defaults\n6. analyzer/banner.go: PrintBanner() shows ASCII art, version, greeting\n7. analyzer/watcher.go: NewWatcher() creates fsnotify watcher\n8. analyzer/watcher.go: ScanAll() adds non-ignored files to pending\n9. analyzer/watcher.go: Flush() calls onChange with pending files\n10. analyzer/analyser.go: Analyse() batches files, processes with AI\n11. analyzer/validator.go: ValidateIndex() checks JSON schemas\n12. analyzer/watcher.go: Run() enters fsnotify loop for changes"
     },
     {
-      "title": "Scan Mode - One-Shot Analysis",
-      "tags": ["user-story", "scan", "ci-cd"],
-      "content": "Developer runs `memo scan` to analyze all files once and exit. Useful for CI or initial setup. The flow: cmd.Execute() dispatches to scanCmd. runScan() validates API key, loads config, acquires lock, initializes index. Creates Analyser and Watcher, calls watcher.ScanAll() to queue all files, then watcher.Flush() blocks until analysis completes. Releases lock and exits with status 0. This replaces the old --once flag with an explicit subcommand."
+      "title": "Scan Mode: One-shot Analysis",
+      "tags": ["scan", "ci", "one-shot", "analysis"],
+      "content": "Developer runs 'memo scan' for CI or manual one-time analysis. Same setup as watch mode but immediately flushes pending files and exits after completion. Useful for generating fresh index without staying resident.\n\nHappy path:\n1. cmd/scan.go: runScan() same setup as watch\n2. analyzer/watcher.go: ScanAll() collects all files\n3. analyzer/watcher.go: Flush() triggers immediate analysis\n4. analyzer/analyser.go: Analyse() processes all files in batches\n5. Exit after completion"
     },
     {
-      "title": "MCP Mode - AI Agent Queries Index",
-      "tags": ["user-story", "mcp", "ai-agent"],
-      "content": "AI agent uses MCP protocol to query .memo/index for codebase context. Agent spawns `memo mcp -p /path/to/project`. cmd/mcp.go validates .memo/index exists (must run watch/scan first). mcp/server.go creates Server and starts JSON-RPC loop over stdio. Agent sends initialize request, server responds with capabilities. Agent can call memo_list_keys to explore structure (returns keys for objects, length for arrays) or memo_get_value to retrieve specific values. Path format uses bracket notation like [arch][modules][0]. Server adds warning if status.json shows analysis in progress (data may be stale)."
+      "title": "MCP Mode: Agent Index Queries",
+      "tags": ["mcp", "json-rpc", "stdio", "ai-agent", "query"],
+      "content": "AI agent runs 'memo mcp' via MCP integration. Server reads JSON-RPC requests from stdin, responds on stdout. Two tools available: memo_list_keys to navigate index structure, memo_get_value to retrieve specific data. Server adds warning if analysis is in progress.\n\nHappy path:\n1. cmd/mcp.go: mcpCmd validates .memo/index exists\n2. mcp/server.go: Serve() creates server, calls Run()\n3. mcp/server.go: Run() reads JSON-RPC from stdin\n4. mcp/server.go: handleRequest() dispatches to handlers\n5. mcp/query.go: ParsePath() parses [file][key][index] notation\n6. mcp/query.go: ListKeys()/GetValue() executes query\n7. mcp/server.go: writeResponse() sends result"
     },
     {
-      "title": "Configuration and Gitignore Handling",
-      "tags": ["user-story", "config", "gitignore"],
-      "content": "Users configure memo via config.yaml with log level, optional agent credentials, and watch settings. The watch.ignore_patterns list specifies files/directories to ignore (defaults: .git, node_modules, .memo, *.log). If a .gitignore file exists in the watched directory, MergeGitignore() parses it and adds unique patterns to ignore list. This ensures memo respects the project's existing gitignore rules without manual configuration."
+      "title": "Schema Validation with Retry",
+      "tags": ["validation", "json-schema", "retry", "error-recovery"],
+      "content": "After AI generates JSON updates, validator checks output against schemas. If validation fails, formats errors into feedback prompt and retries (up to 5 times) with the error context. This ensures index files always conform to expected structure.\n\nHappy path:\n1. analyzer/analyser.go: analyseBatch() calls AI\n2. analyzer/validator.go: ValidateIndex() checks schemas\n3. On failure: FormatValidationErrors() creates feedback\n4. Retry with feedback prompt (max 5 times)\n5. Validate until valid or max retries"
     },
     {
-      "title": "AI Analysis with Validation Loop",
-      "tags": ["call-chain", "analysis", "validation"],
-      "content": "When onChange callback fires, Analyser.Analyse() is called with changed files. It sets status to 'analyzing', converts absolute paths to relative (saves tokens), batches files if count exceeds threshold (default 100). Each batch creates a kimi-agent-sdk session with local MCP config (.memo/mcp.json to prevent recursion) and deterministic session ID (hash of workDir). The prompt is built from embedded templates. runPrompt() sends prompt and processes streamed response using LineBuffer (500ms timeout). After AI completes, ValidateIndex() checks JSON against schemas. If invalid, error feedback is appended and retried (max 5 times). Finally, status is set to 'idle'."
+      "title": "Single Instance Lock",
+      "tags": ["lock", "flock", "single-instance", "concurrency"],
+      "content": "Only one watcher can run per project directory. TryLock uses OS-specific file locking (flock on Unix, LockFileEx on Windows) on .memo/watcher.lock. Includes PID for debugging. Lock released on process exit.\n\nHappy path:\n1. cmd/watch.go: runWatch() calls analyzer.TryLock()\n2. analyzer/lock_unix.go: Flock(LOCK_EX|LOCK_NB)\n3. Write PID to lock file\n4. Return file handle for deferred Unlock()\n5. On conflict: error 'another instance is running'"
     },
     {
-      "title": "Concurrent Analysis Guard",
-      "tags": ["call-chain", "concurrency", "semaphore"],
-      "content": "The Watcher uses a capacity-1 channel (sem chan struct{}) as a binary semaphore to prevent overlapping analyses. When Flush() is called (by timer or directly), it attempts non-blocking acquisition via select with default case. If the semaphore is held (analysis running), Flush returns immediately - files remain in pending set for next timer. If acquired, it stops both debounce and max-wait timers, collects pending files, clears the set, and calls onChange. The semaphore is released via defer after callback completes."
+      "title": "Auto-Update Check",
+      "tags": ["update", "github-api", "async", "version"],
+      "content": "On startup in watch/scan modes, async checks GitHub releases for newer version. 2-second timeout prevents blocking. If update available, shows notice in banner with platform-specific install command.\n\nHappy path:\n1. cmd/watch.go: runWatch() calls CheckUpdateAsync()\n2. internal/updater.go: goroutine queries GitHub API\n3. Compare semver, return UpdateInfo if newer\n4. analyzer/banner.go: PrintBanner() shows update notice"
     },
     {
-      "title": "History Logging for Debugging",
-      "tags": ["call-chain", "debugging", "logging"],
-      "content": "Both MCP server and watcher write structured logs to .memo/.history as JSONL. internal.HistoryLogger provides NewHistoryLogger(memoDir, source) which creates a logger with auto-incrementing sequence numbers. MCP server logs requests/responses with duration. Watcher logs via internal.Log* functions which also write to historyLog if initialized. This dual-logging provides both real-time visibility and persistent debug logs without cluttering stdout."
+      "title": "MCP Path Query Security",
+      "tags": ["security", "validation", "whitelist", "path-traversal"],
+      "content": "MCP query parser has security controls: allowedFiles whitelist (arch/interface/stories/issues), 100-char key limit, control character rejection, no path traversal. Invalid paths return clear error messages.\n\nHappy path:\n1. mcp/query.go: ParsePath() extracts file name\n2. Validate against allowedFiles whitelist\n3. validateKey() checks length and chars\n4. Return structured PathSegment array\n5. On invalid: return descriptive error"
     }
   ]
 }
