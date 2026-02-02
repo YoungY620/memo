@@ -1,278 +1,26 @@
 {
   "issues": [
     {
-      "tags": ["design-decision"],
-      "title": "Debounce and max-wait for batching file changes",
-      "description": "File changes are batched using two timers: a debounce timer (default 30s) that resets on each new change, and a max-wait timer (default 5min) that forces a flush even if changes keep coming. This prevents excessive AI calls during rapid edits while ensuring changes aren't delayed indefinitely during continuous development.",
-      "locations": [
-        {
-          "file": "watcher.go",
-          "keyword": "debounce",
-          "line": 133
-        },
-        {
-          "file": "watcher.go",
-          "keyword": "maxWait",
-          "line": 137
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Validation loop with feedback prompts",
-      "description": "After the AI updates JSON files, a validation step checks schema compliance. If validation fails, the AI receives a feedback prompt with error details and gets up to 5 attempts to fix the issues. This self-healing approach improves reliability without human intervention.",
+      "tags": ["todo", "cleanup"],
+      "title": "Root-level deprecated files should be removed",
+      "description": "Old root-level files (analyser.go, watcher.go, config.go, validator.go, lock.go, status.go, log.go) still exist alongside new package versions in analyzer/, cmd/, internal/. These are deprecated and should be removed. Keep only main.go at root level.",
       "locations": [
         {
           "file": "analyser.go",
-          "keyword": "maxRetries",
-          "line": 204
-        },
-        {
-          "file": "analyser.go",
-          "keyword": "feedbackPrompt",
-          "line": 217
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Optional agent configuration with kimi defaults",
-      "description": "The agent.api_key and agent.model fields are optional. If not provided, the kimi-agent-sdk uses its default configuration. This allows zero-config usage for users who have kimi CLI configured, while supporting custom models for advanced users.",
-      "locations": [
-        {
-          "file": "analyser.go",
-          "keyword": "kimi defaults",
-          "line": 168
-        },
-        {
-          "file": "config.yaml",
-          "keyword": "api_key",
-          "line": 4
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Gitignore pattern merging for automatic exclusions",
-      "description": "The watcher automatically loads .gitignore patterns and merges them with configured ignore_patterns. This reduces configuration burden and ensures ignored files (like build artifacts, dependencies) are not watched or analyzed. Negation patterns (!pattern) are intentionally skipped as they add complexity.",
-      "locations": [
-        {
-          "file": "config.go",
-          "keyword": "MergeGitignore",
-          "line": 119
-        },
-        {
-          "file": "config.go",
-          "keyword": "negation",
-          "line": 84
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Embedded prompt files for distribution simplicity",
-      "description": "Prompts (context.md, analyse.md, feedback.md) are embedded into the binary using Go's embed directive. This allows single-binary distribution without needing to ship separate prompt files, at the cost of requiring a rebuild to change prompts.",
-      "locations": [
-        {
-          "file": "analyser.go",
-          "keyword": "embed",
-          "line": 17
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Auto-approve mode for unattended operation",
-      "description": "The kimi-agent-sdk session is created with WithAutoApprove(), meaning all tool calls from the AI are automatically approved. This enables fully autonomous operation but means the AI has unrestricted access to the file system within the work directory.",
-      "locations": [
-        {
-          "file": "analyser.go",
-          "keyword": "WithAutoApprove",
-          "line": 163
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "LineBuffer for streaming output with 500ms timeout",
-      "description": "The analyser uses a LineBuffer to accumulate streamed AI output and flush on complete lines or after 500ms timeout. This produces cleaner debug logs with complete lines instead of fragmented tokens. The buffer force-flushes on step completion or StatusUpdate events to ensure no content is lost. See spec/line-buffer-design.md for full design rationale.",
-      "locations": [
-        {
-          "file": "analyser.go",
-          "keyword": "NewLineBuffer",
-          "line": 237
-        },
-        {
-          "file": "log.go",
-          "keyword": "LineBuffer",
-          "line": 88
-        }
-      ]
-    },
-    {
-      "tags": ["compromise"],
-      "title": "Simple pattern matching for ignore patterns",
-      "description": "The ignored() function uses basic string matching and wildcard suffix checking, not full glob/gitignore semantics. Patterns like **/ or complex negations are not fully supported. This is simpler and covers most use cases but may not match gitignore behavior exactly in edge cases.",
-      "locations": [
-        {
-          "file": "watcher.go",
-          "keyword": "ignored",
-          "line": 77
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Separation of prompts and design specs into distinct directories",
-      "description": "The project uses prompts/ for actual AI prompt templates (context.md, analyse.md, feedback.md) that are embedded in the binary, and spec/ for design specification documents that describe feature rationale and implementation details. This keeps operational files separate from documentation.",
-      "locations": [
-        {
-          "file": "prompts/context.md",
-          "keyword": "prompts",
+          "keyword": "package main",
           "line": 1
         },
         {
-          "file": "spec/line-buffer-design.md",
-          "keyword": "设计文档",
+          "file": "watcher.go",
+          "keyword": "package main",
           "line": 1
         }
       ]
     },
     {
-      "tags": ["design-decision"],
-      "title": "Code as single source of truth with doc-sync tracking",
-      "description": "The context.md prompt establishes that code is the single source of truth - the AI should reflect actual code behavior, not what docs or comments claim. Additionally, the AI is restricted to only modifying .memo/index/*.json files and should use the 'outdated-docs' tag to track discrepancies between code and documentation rather than fixing external docs directly. This ensures documentation accuracy while preventing unintended modifications to the codebase.",
-      "locations": [
-        {
-          "file": "prompts/context.md",
-          "keyword": "single source of truth",
-          "line": 236
-        },
-        {
-          "file": "prompts/context.md",
-          "keyword": "outdated-docs",
-          "line": 238
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Once Mode for one-shot scanning via public Flush()",
-      "description": "The 'once mode' feature performs a single scan and analysis, then exits without entering the watch loop. This is useful for CI/CD pipelines or one-time documentation generation. The key design choice was to make flush() public as Flush(), allowing both normal mode (timer-triggered) and once mode (direct call from main.go after ScanAll) to reuse the same logic. The flow in once mode is: ScanAll() → pending → Flush() → onChange → exit.",
-      "locations": [
-        {
-          "file": "main.go",
-          "keyword": "--once",
-          "line": 23
-        },
-        {
-          "file": "main.go",
-          "keyword": "onceFlag",
-          "line": 128
-        },
-        {
-          "file": "watcher.go",
-          "keyword": "Flush()",
-          "line": 141
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Module-by-module thorough analysis workflow",
-      "description": "The analyse.md prompt enforces a thorough, module-by-module workflow to ensure no files are skipped during analysis. Instead of reading all files at once and updating index files in a single batch, the AI creates a fine-grained todo list with one item per changed file, groups them by module/directory, reads files one by one marking each as done, and updates index files after completing each module. This prevents context overflow on large changesets and ensures complete coverage.",
-      "locations": [
-        {
-          "file": "prompts/analyse.md",
-          "keyword": "Create Todo List",
-          "line": 5
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "MCP mode as separate read-only process",
-      "description": "MCP mode runs as a separate process from the watcher, sharing the same .memo/index directory. This separation of concerns means: (1) the watcher maintains the index, (2) MCP provides read-only queries. MCP mode requires existing index and exits with error if not found. This architecture allows running multiple MCP servers against the same index or running MCP without a watcher if manual updates are preferred.",
-      "locations": [
-        {
-          "file": "main.go",
-          "keyword": "--mcp",
-          "line": 24
-        },
-        {
-          "file": "main.go",
-          "keyword": "mcp.Serve",
-          "line": 51
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision", "security"],
-      "title": "State machine parser for MCP path queries with strict validation",
-      "description": "The MCP query path parser uses a state machine design to handle bracket notation like [arch][modules][0]. It includes security measures: (1) allowed files whitelist (arch, interface, stories, issues), (2) key length limit (100 chars), (3) control character rejection, (4) proper escape sequence handling (\\[, \\], \\\\). This prevents path injection attacks and ensures only valid index files can be accessed.",
-      "locations": [
-        {
-          "file": "mcp/query.go",
-          "keyword": "ParsePath",
-          "line": 41
-        },
-        {
-          "file": "mcp/query.go",
-          "keyword": "allowedFiles",
-          "line": 32
-        },
-        {
-          "file": "mcp/query.go",
-          "keyword": "validateKey",
-          "line": 127
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "MCP tools include schema in description for LLM context",
-      "description": "The memo_list_keys and memo_get_value tool descriptions include a summary of the JSON schema for each file type. This provides LLMs with context about what data is available without needing to query first, enabling more efficient navigation of the index.",
-      "locations": [
-        {
-          "file": "mcp/server.go",
-          "keyword": "schemaDesc",
-          "line": 254
-        },
-        {
-          "file": "mcp/server.go",
-          "keyword": "tools()",
-          "line": 280
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "MCP tool descriptions include whenToUse guidance for LLMs",
-      "description": "MCP tool descriptions embed a 'whenToUse' constant explaining when LLMs should use memo tools FIRST - specifically for understanding, summarizing, exploring, or navigating codebases. Lists typical requests (summarize repo, show architecture, find issues) and explains why memo is better than reading files directly (pre-indexed, structured, efficient, contextual). This guides LLMs to use the indexed documentation before attempting to scan the filesystem.",
-      "locations": [
-        {
-          "file": "mcp/server.go",
-          "keyword": "whenToUse",
-          "line": 260
-        }
-      ]
-    },
-    {
-      "tags": ["todo"],
-      "title": "arch.json internal submodules testdata not added",
-      "description": "The spec/arch-internal-submodules.md spec has an unchecked TODO item for adding testdata test cases for the internal submodules schema. The schema and validator changes were completed, but test data was not added.",
-      "locations": [
-        {
-          "file": "spec/arch-internal-submodules.md",
-          "keyword": "testdata",
-          "line": 69
-        }
-      ]
-    },
-    {
-      "tags": ["outdated-docs"],
-      "title": "Spec claims --mcp-with-watcher flag exists but it is not implemented",
-      "description": "The spec/feature-mcp-default.md and spec/plan-and-progress.md documents describe a --mcp-with-watcher flag that would spawn a watcher subprocess while running the MCP server. However, this flag is NOT implemented in main.go - only --mcp (MCP server only) exists. The spec shows architecture diagrams and TODO items marked as complete, but the actual code does not have this functionality. To use both watcher and MCP, users must run two separate processes.",
+      "tags": ["todo", "outdated-docs"],
+      "title": "--mcp-with-watcher not implemented but documented in spec",
+      "description": "Spec mentions --mcp-with-watcher flag that runs MCP server alongside watcher, but this is NOT implemented in code. Currently watch and mcp are separate commands that must run in different terminals. Either implement the feature or update spec to reflect current design.",
       "locations": [
         {
           "file": "spec/feature-mcp-default.md",
@@ -280,221 +28,144 @@
           "line": 3
         },
         {
-          "file": "spec/plan-and-progress.md",
-          "keyword": "feature-mcp-default",
-          "line": 7
-        },
-        {
-          "file": "main.go",
-          "keyword": "mcpFlag",
-          "line": 24
+          "file": "cmd/mcp.go",
+          "keyword": "mcpCmd",
+          "line": 10
         }
       ]
     },
     {
-      "tags": ["design-decision"],
-      "title": "Concurrent analysis guard prevents overlapping Flush() calls",
-      "description": "When multiple Flush() calls overlap (e.g., Timer1 triggers Flush() which starts a long-running Analyse(), then Timer2 triggers another Flush() before Timer1 finishes), both would try to write to index files simultaneously causing conflicts. The solution uses a capacity-1 channel 'sem chan struct{}' as a binary semaphore with non-blocking acquisition: if analysis is already running, the flush skips (files stay in pending) and logs a debug message. This ensures only one analysis runs at a time while allowing timer callbacks to return immediately. Accumulated files will be processed by the next timer-triggered flush after the current analysis completes.",
+      "tags": ["todo", "enhancement"],
+      "title": "LineBuffer timeout should be configurable",
+      "description": "LineBuffer timeout is hardcoded to 500ms in analyzer/analyser.go. Should be configurable via config.yaml (e.g., output.line_buffer_timeout_ms) for different use cases and environments.",
       "locations": [
         {
-          "file": "watcher.go",
-          "keyword": "sem",
-          "line": 23
-        },
-        {
-          "file": "watcher.go",
-          "keyword": "w.sem <-",
-          "line": 144
+          "file": "internal/log.go",
+          "keyword": "NewLineBuffer",
+          "line": 88
         }
       ]
     },
     {
-      "tags": ["todo"],
-      "title": "Configurable LineBuffer timeout",
-      "description": "The spec/line-buffer-design.md mentions adding a configurable timeout parameter in config.yaml for the LineBuffer (output.line_buffer_timeout_ms). Currently the timeout is hardcoded to 500ms in analyser.go. This would allow users to tune the timeout for their environment.",
+      "tags": ["todo", "feature"],
+      "title": "Future Belongs to Future - periodic index rebuild",
+      "description": "AI context accumulates stale info over long sessions. Need mechanism for periodic full index rebuild with fresh AI sessions to maintain accuracy. Planned approach: dual-index rotation (blue-green style), configurable rebuild interval, randomized file order for diversity.",
       "locations": [
         {
-          "file": "spec/line-buffer-design.md",
-          "keyword": "line_buffer_timeout_ms",
-          "line": 168
-        },
-        {
-          "file": "analyser.go",
-          "keyword": "500 * time.Millisecond",
-          "line": 237
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Local MCP config to prevent infinite recursion",
-      "description": "To prevent infinite recursion when memo is configured in ~/.kimi/mcp.json, the analyser uses a local MCP config file (.memo/mcp.json) via WithMCPConfigFile(). This isolates the watcher's AI session from the user's global MCP config, preventing memo from recursively spawning itself. The .memo/mcp.json file is created by initIndex() in main.go and can be customized by users to add additional MCP servers for watcher sessions.",
-      "locations": [
-        {
-          "file": "spec/fix-mcp-infinite-recursion.md",
-          "keyword": "MCP Infinite Recursion",
+          "file": "spec/feature-future-belongs-to-future.md",
+          "keyword": "Future Belongs to Future",
           "line": 1
         },
         {
-          "file": "analyser.go",
-          "keyword": "WithMCPConfigFile",
-          "line": 164
-        },
-        {
-          "file": "main.go",
-          "keyword": "mcp.json",
-          "line": 177
-        }
-      ]
-    },
-    {
-      "tags": ["todo"],
-      "title": "MCP infinite recursion fix needs testing verification",
-      "description": "The fix for MCP infinite recursion (using local .memo/mcp.json) was implemented but the spec file (spec/fix-mcp-infinite-recursion.md) has unchecked TODO items: (1) Test that no recursion occurs when memo is in ~/.kimi/mcp.json, (2) Test that watcher analysis still works correctly with the new MCP config isolation. These tests should be added or manually verified.",
-      "locations": [
-        {
-          "file": "spec/fix-mcp-infinite-recursion.md",
-          "keyword": "TODO",
-          "line": 189
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision", "optimization"],
-      "title": "Batched analysis for large codebases to prevent context overflow",
-      "description": "When the codebase is very large (thousands of files), the file path list alone can exceed the LLM context window limit. The solution: (1) toRelativePaths() converts absolute paths to relative paths, reducing token usage, (2) splitIntoBatches() recursively splits files by directory when count exceeds threshold (default 100 files), (3) Analyse() processes batches sequentially, calling analyseBatch() for each, (4) analyseBatch() adds batch info to prompt ('Batch X of Y') so the AI knows context. The recursive splitting groups related files by directory and only splits further when a directory exceeds the threshold.",
-      "locations": [
-        {
-          "file": "analyser.go",
-          "keyword": "toRelativePaths",
-          "line": 53
-        },
-        {
-          "file": "analyser.go",
-          "keyword": "splitIntoBatches",
-          "line": 66
-        },
-        {
-          "file": "analyser.go",
-          "keyword": "maxFilesPerBatch",
-          "line": 26
-        },
-        {
-          "file": "analyser.go",
-          "keyword": "analyseBatch",
-          "line": 146
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Watcher single instance lock and analysis status awareness",
-      "description": "Two-part solution for watcher reliability: (1) Watcher Lock - flock on .memo/watcher.lock prevents multiple watchers on same directory, avoiding data corruption. lock.go provides TryLock(memoDir)/Unlock(f) using syscall.Flock with LOCK_EX|LOCK_NB. (2) Analysis Status - .memo/status.json signals ongoing analysis to MCP clients. status.go provides SetStatus()/GetStatus(). The analyser calls SetStatus('analyzing') before and SetStatus('idle') after analysis (via defer). MCP server checks status via getStatus() and adds Warning field to ToolCallResult responses when status is 'analyzing', including time elapsed since analysis started.",
-      "locations": [
-        {
-          "file": "lock.go",
-          "keyword": "TryLock",
-          "line": 14
-        },
-        {
-          "file": "status.go",
-          "keyword": "SetStatus",
-          "line": 19
-        },
-        {
-          "file": "analyser.go",
-          "keyword": "SetStatus",
-          "line": 127
-        },
-        {
-          "file": "mcp/server.go",
-          "keyword": "getStatus",
-          "line": 240
-        },
-        {
-          "file": "main.go",
-          "keyword": "TryLock",
-          "line": 85
-        }
-      ]
-    },
-    {
-      "tags": ["design-decision"],
-      "title": "Deterministic session ID to prevent session pollution",
-      "description": "Each memo analysis uses a deterministic session ID format 'memo-<workdir-hash>' (e.g., memo-a7c3f2b1) derived from SHA256 hash of the working directory path. This is generated by generateSessionID(workDir) and stored in the Analyser struct. Benefits: (1) Single session per project - analyses can potentially reuse context, (2) Easy identification via 'memo-' prefix, (3) Deterministic - same project always uses same ID, (4) Isolated - different projects have different IDs. The session ID is logged at startup for debugging purposes.",
-      "locations": [
-        {
-          "file": "analyser.go",
-          "keyword": "generateSessionID",
-          "line": 46
-        },
-        {
-          "file": "analyser.go",
+          "file": "analyzer/analyser.go",
           "keyword": "sessionID",
           "line": 41
         }
       ]
     },
     {
-      "tags": ["design-decision"],
-      "title": "Delete before copy to prevent dyld zombie processes on macOS",
-      "description": "Fixed a macOS-specific issue where reinstalling memo binary while zombie processes hold references to the old file caused new processes to hang in dyld (Uninterruptible Sleep state). The fix ensures `rm -f` is called before copying the new binary, creating a new inode that has no conflict with zombie process references. Implemented in Makefile. Note: Existing UE zombie processes can only be cleared by system reboot.",
+      "tags": ["todo", "enhancement"],
+      "title": "Batch size not configurable",
+      "description": "File batch size for analysis is hardcoded (maxFilesPerBatch). Large projects may benefit from different batch sizes. Should add agent.batch_size config option.",
       "locations": [
         {
-          "file": "Makefile",
-          "keyword": "rm -f",
+          "file": "analyzer/analyser.go",
+          "keyword": "maxFilesPerBatch",
           "line": 26
         }
       ]
     },
     {
-      "tags": ["design-decision"],
-      "title": "HistoryLogger for debugging MCP and watcher events",
-      "description": "Both MCP server and watcher write structured JSONL logs to .memo/.history. The mcp.HistoryLogger struct provides NewHistoryLogger(memoDir, source), Log(entry), LogRequest/LogResponse (with duration tracking), LogError/LogInfo/LogDebug. MCP server creates logger with source 'mcp', watcher uses source 'watcher' via InitHistoryLogger in log.go. Each entry has seq (auto-increment), ts (RFC3339Nano), src, type, and context-specific fields. This enables debugging without cluttering stdout.",
+      "tags": ["todo", "enhancement"],
+      "title": "Validation retry count not configurable",
+      "description": "JSON schema validation retries are hardcoded to 5 (maxRetries). May want to adjust for different models or reliability requirements. Should add agent.max_retries config option.",
       "locations": [
         {
-          "file": "mcp/server.go",
-          "keyword": "HistoryLogger",
-          "line": 96
-        },
-        {
-          "file": "mcp/server.go",
-          "keyword": "NewHistoryLogger",
-          "line": 118
-        },
-        {
-          "file": "log.go",
-          "keyword": "InitHistoryLogger",
-          "line": 34
+          "file": "analyzer/analyser.go",
+          "keyword": "maxRetries",
+          "line": 204
         }
       ]
     },
     {
       "tags": ["design-decision"],
-      "title": "Auto-generated .memo/.gitignore for runtime file exclusion",
-      "description": "The initIndex() function creates .memo/.gitignore to exclude runtime files (watcher.lock, status.json, .history) from version control while allowing index/*.json files to be committed. This ensures users can check in their documentation index without accidentally including volatile files that would cause git conflicts.",
+      "title": "Cobra CLI over flag package",
+      "description": "Migrated from Go flag package to spf13/cobra for CLI. Enables explicit subcommands (watch/scan/mcp), better help text, auto-generated completion, and standard UX. Cobra is industry standard for Go CLIs.",
       "locations": [
         {
-          "file": "main.go",
-          "keyword": "gitignoreFile",
-          "line": 186
-        },
-        {
-          "file": "main.go",
-          "keyword": "gitignoreContent",
-          "line": 188
+          "file": "cmd/root.go",
+          "keyword": "cobra.Command",
+          "line": 15
         }
       ]
     },
     {
-      "tags": ["todo", "design-decision"],
-      "title": "Periodic index rebuild with fresh sessions (Future Belongs to Future)",
-      "description": "Planned feature to prevent accumulated drift/hallucination in long-running sessions. Uses dual-index rotation (blue-green deployment style): (1) A Rotator component manages two Analyser instances, (2) Active analyser writes to index/, rebuild analyser writes to index-rebuild/, (3) After rebuild completes + stabilize period, atomic swap via rename, (4) Watcher sends changes to both analysers during rebuild. Additionally includes Randomized File Order: shuffle files and batch order at Analyse() entry to ensure each generation produces different understanding (LLMs are order-sensitive). Configuration: rebuild.enabled, rebuild.interval_minutes (default 30), rebuild.stabilize_minutes (default 5). Benefits: fresh session avoids context accumulation, full ScanAll catches incremental update gaps, randomized order adds diversity, seamless MCP reads. NOT YET IMPLEMENTED - all spec TODOs are unchecked.",
+      "tags": ["design-decision"],
+      "title": "Package structure: cmd/analyzer/mcp/internal",
+      "description": "Refactored from flat main package to 4-package structure for better modularity and testability. Separation of concerns: CLI (cmd), core logic (analyzer), protocol (mcp), shared utils (internal).",
       "locations": [
         {
-          "file": "spec/feature-future-belongs-to-future.md",
-          "keyword": "Future Belongs to Future",
+          "file": "cmd/root.go",
+          "keyword": "package cmd",
           "line": 1
+        },
+        {
+          "file": "analyzer/analyser.go",
+          "keyword": "package analyzer",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "HistoryLogger moved to internal package for sharing",
+      "description": "Moved HistoryLogger to internal/ to be shared between watcher and MCP server. Both need logging to .memo/.history for debugging. Avoids code duplication and ensures consistent log format.",
+      "locations": [
+        {
+          "file": "internal/history.go",
+          "keyword": "HistoryLogger",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Semaphore for concurrent analysis guard",
+      "description": "Added sem chan struct{} (capacity-1) to Watcher to prevent overlapping analyses. Debounce timer could fire while previous analysis still running. Semaphore with non-blocking acquire ensures sequential execution without blocking timer callbacks.",
+      "locations": [
+        {
+          "file": "analyzer/watcher.go",
+          "keyword": "sem",
+          "line": 24
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Local MCP config prevents infinite recursion",
+      "description": "The analyser uses .memo/mcp.json instead of global ~/.kimi/mcp.json to prevent infinite recursion when memo is configured as an MCP server in the user's global config. Created automatically by initIndex().",
+      "locations": [
+        {
+          "file": "analyzer/analyser.go",
+          "keyword": "WithMCPConfigFile",
+          "line": 164
+        },
+        {
+          "file": "cmd/common.go",
+          "keyword": "mcp.json",
+          "line": 50
+        }
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Deterministic session ID from workDir hash",
+      "description": "Each memo analysis uses a deterministic session ID format 'memo-<workdir-hash>' derived from SHA256 of the working directory path. Benefits: single session per project (reuse context), easy identification via prefix, same project always uses same ID.",
+      "locations": [
+        {
+          "file": "analyzer/analyser.go",
+          "keyword": "generateSessionID",
+          "line": 46
         }
       ]
     }

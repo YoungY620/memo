@@ -2,64 +2,134 @@
   "modules": [
     {
       "name": "main",
-      "description": "Application entry point. Parses CLI flags, loads configuration, initializes the .memo directory (creates .memo/index/ with empty JSON files, .memo/mcp.json for isolated MCP config, and .memo/.gitignore for runtime file exclusion), acquires single-instance lock via TryLock(), initializes HistoryLogger for watcher logs, initializes status to 'idle', creates the watcher and analyser, and handles graceful shutdown on SIGINT/SIGTERM. Supports three modes: watch mode (default) for continuous monitoring, once mode (--once) for one-shot analysis, and MCP mode (--mcp) for read-only index queries via stdio.",
-      "interfaces": "Receives CLI flags (--path, --config, --version, --once, --mcp, --log-level). Calls config.LoadConfig, TryLock(memoDir) to acquire single-instance lock, InitHistoryLogger(memoDir) to start watcher logging, SetStatus('idle') to initialize status, creates NewWatcher and NewAnalyser, triggers watcher.ScanAll for initial scan. In once mode, calls watcher.Flush() directly and exits; in MCP mode, calls mcp.Serve() and exits; in watch mode, starts watcher.Run() and waits for shutdown signal. On exit, releases lock via defer Unlock() and resets status to 'idle'."
+      "description": "Application entry point. Sets version and delegates to cmd.Execute() for CLI handling.",
+      "interfaces": "Receives Version from build flags, calls cmd.SetVersion() and cmd.Execute(). Exit on error."
     },
     {
-      "name": "config",
-      "description": "Configuration management. Loads YAML config file with agent settings (API key, model), watch settings (ignore patterns, debounce/max-wait times), and log level. Also parses .gitignore and merges patterns into the ignore list.",
-      "interfaces": "LoadConfig(path) returns *Config. Config.MergeGitignore(workDir) merges .gitignore patterns. LoadGitignore(workDir) parses .gitignore file and returns patterns. normalizeGitignorePattern(pattern) normalizes gitignore patterns. Used by main module at startup."
+      "name": "cmd",
+      "description": "CLI command layer using Cobra framework. Defines three commands: watch (default), scan, and mcp. Handles configuration loading, directory initialization, and orchestrates analyzer/mcp packages.",
+      "interfaces": "Execute() runs the root command. SetVersion(v) sets version. Exports Config types for YAML parsing.",
+      "internal": {
+        "submodules": [
+          {
+            "name": "root",
+            "description": "Root command definition with global flags (--path, --log-level, --version)",
+            "interfaces": "rootCmd with PersistentFlags, resolveWorkDir() helper"
+          },
+          {
+            "name": "watch",
+            "description": "Watch mode - monitors file changes continuously, updates index on change",
+            "interfaces": "watchCmd with --config, --skip-scan flags. Calls analyzer.NewWatcher, analyzer.NewAnalyser"
+          },
+          {
+            "name": "scan",
+            "description": "Scan mode - analyzes all files once, updates index, then exits",
+            "interfaces": "scanCmd with --config flag. Same flow as watch but exits after Flush()"
+          },
+          {
+            "name": "mcp",
+            "description": "MCP mode - starts stdio JSON-RPC server for AI agents to query index",
+            "interfaces": "mcpCmd. Validates index exists, calls mcp.Serve(workDir)"
+          },
+          {
+            "name": "config",
+            "description": "Configuration types and loading from YAML file with defaults",
+            "interfaces": "LoadConfig(path), Config.MergeGitignore(workDir), LoadGitignore(workDir)"
+          },
+          {
+            "name": "common",
+            "description": "Shared utilities: index initialization, config setup",
+            "interfaces": "initIndex(indexDir) creates .memo/index/*.json, mcp.json, .gitignore. loadConfigAndSetup() loads config and sets log level"
+          }
+        ],
+        "relationships": "root → watch/scan/mcp commands → config + common utilities"
+      }
     },
     {
-      "name": "watcher",
-      "description": "File system watcher using fsnotify. Watches directories recursively, ignores files matching configured patterns, implements debouncing (quiet period) and max-wait logic to batch file change events before triggering analysis. Uses a capacity-1 semaphore channel to prevent concurrent analysis when multiple Flush() calls overlap.",
-      "interfaces": "NewWatcher(root, ignore, debounceMs, maxWaitMs, onChange) creates watcher with semaphore guard. ScanAll() queues all existing files. Flush() uses non-blocking semaphore acquire to skip if analysis already running, otherwise triggers the onChange callback with pending files (used by once mode or timers). Run() starts event loop. Close() cleans up. Calls onChange callback with batched file list."
-    },
-    {
-      "name": "analyser",
-      "description": "AI-powered analysis engine with batching support for large codebases. Uses kimi-agent-sdk to create a session with local MCP config (.memo/mcp.json) to prevent infinite recursion. Generates a deterministic session ID (memo-<8-char-hash>) based on working directory path. Converts absolute paths to relative paths and splits large file lists into batches (max 100 files by default) using recursive directory-based splitting. Each batch is processed sequentially with batch info added to the prompt.",
-      "interfaces": "NewAnalyser(cfg, workDir) creates analyser with deterministic session ID. Analyse(ctx, changedFiles) converts to relative paths via toRelativePaths(), splits into batches via splitIntoBatches() when count exceeds maxFilesPerBatch (100), then processes each batch via analyseBatch(). Sets status to 'analyzing'/'idle' around the process. analyseBatch() creates AI session with WithMCPConfigFile and WithSession, sends prompts with batch info ('Batch X of Y'), runs validation loop with up to 5 retries. Helper functions: generateSessionID(workDir), toRelativePaths(files, workDir), splitIntoBatches(files, threshold), runPrompt(ctx, session, prompt) with LineBuffer for streaming output."
-    },
-    {
-      "name": "validator",
-      "description": "JSON schema validator for .memo/index files. Defines schemas for arch.json, interface.json, stories.json, and issues.json. Validates each file against its schema and reports errors. The arch.json schema supports optional 'internal' field with submodules.",
-      "interfaces": "ValidateIndex(indexDir) returns ValidationResult. FormatValidationErrors(result) formats errors as string. Called by analyser after each AI response."
-    },
-    {
-      "name": "log",
-      "description": "Logging utilities with four levels (error, notice, info, debug) and LineBuffer for streaming output. Also provides HistoryLogger initialization functions. LineBuffer accumulates text and flushes on newlines, timeout (500ms), or when forced, producing cleaner logs with complete lines instead of fragmented tokens.",
-      "interfaces": "SetLogLevel(level) sets global log level. logError/logNotice/logInfo/logDebug functions for logging (also write to historyLog if initialized). InitHistoryLogger(memoDir) initializes global watcher history logger. CloseHistoryLogger() closes the history logger. NewLineBuffer(timeout) creates a buffer, Write(s) appends text, Flush(force) returns content to output."
-    },
-    {
-      "name": "lock",
-      "description": "Watcher single instance lock using flock. Prevents multiple watcher processes from running on the same directory, which would cause race conditions and data corruption when writing to .memo/index/*.json files.",
-      "interfaces": "TryLock(memoDir) attempts to acquire exclusive lock on .memo/watcher.lock using syscall.Flock with LOCK_EX|LOCK_NB (non-blocking). Returns file handle if successful, error if another watcher is running. Writes PID to lock file for debugging. Unlock(f) releases the lock. Called by main at startup for watcher/once modes."
-    },
-    {
-      "name": "status",
-      "description": "Analysis status management via .memo/status.json. Signals to MCP clients whether analysis is in progress, allowing them to warn users about potentially stale data.",
-      "interfaces": "SetStatus(memoDir, status) writes status ('idle' or 'analyzing') to .memo/status.json. When 'analyzing', includes timestamp. GetStatus(memoDir) reads status, returns 'idle' if file missing or invalid. Called by analyser before/after Analyse()."
+      "name": "analyzer",
+      "description": "Core analysis engine. Watches filesystem with fsnotify, invokes AI via kimi-agent-sdk, validates JSON output against schemas. Includes status management, locking, and startup banner.",
+      "interfaces": "NewAnalyser(AgentConfig, workDir), Analyse(ctx, files). NewWatcher(root, ignore, debounce, maxWait, onChange), ScanAll(), Flush(), Run(), Close(). ValidateIndex(indexDir). TryLock/Unlock. SetStatus/GetStatus. PrintBanner(opts).",
+      "internal": {
+        "submodules": [
+          {
+            "name": "analyser",
+            "description": "AI-powered analysis using kimi-agent-sdk. Batches files, sends prompts, validates output with retry loop (max 5 attempts).",
+            "interfaces": "NewAnalyser(), Analyse(ctx, files), analyseBatch(), runPrompt(). Uses embedded prompts/*.md"
+          },
+          {
+            "name": "watcher",
+            "description": "Filesystem watcher using fsnotify. Debounce/max-wait batching, concurrent analysis guard via semaphore.",
+            "interfaces": "NewWatcher(), ScanAll(), Flush(), Run(), Close(), add(), ignored()"
+          },
+          {
+            "name": "validator",
+            "description": "JSON schema validation for .memo/index files using gojsonschema",
+            "interfaces": "ValidateIndex(indexDir) → ValidationResult, FormatValidationErrors()"
+          },
+          {
+            "name": "lock",
+            "description": "Single-instance lock using flock (Unix) or LockFileEx (Windows)",
+            "interfaces": "TryLock(memoDir) → *os.File, Unlock(f). Platform-specific: lock_unix.go, lock_windows.go"
+          },
+          {
+            "name": "status",
+            "description": "Analysis status tracking via .memo/status.json",
+            "interfaces": "SetStatus(memoDir, status), GetStatus(memoDir) → Status"
+          },
+          {
+            "name": "banner",
+            "description": "Startup banner with ASCII art, version, greeting, update notice. Adapts to terminal width.",
+            "interfaces": "PrintBanner(BannerOptions), UpdateInfo struct"
+          }
+        ],
+        "relationships": "analyser uses watcher for file events, validator for output checking, status for progress tracking. lock ensures single instance. banner for UX."
+      }
     },
     {
       "name": "mcp",
-      "description": "MCP (Model Context Protocol) server that exposes .memo/index/*.json via safe JSON path query. Provides read-only access to the documentation index via stdio-based JSON-RPC 2.0 protocol. Tool descriptions include embedded LLM guidance (whenToUse) with strong directive that LLMs should ALWAYS check project state via memo BEFORE doing anything - coding, debugging, refactoring, or answering questions. Checks .memo/status.json before each tool call and adds a 'warning' field to responses when analysis is in progress. Includes HistoryLogger for request/response logging to .memo/.history.",
-      "interfaces": "Serve(workDir) starts the MCP server and blocks. Exposes two tools: memo_list_keys and memo_get_value. Server.getStatus() reads .memo/status.json and handleToolCall() adds Warning to ToolCallResult when status is 'analyzing'. Used by main when --mcp flag is set.",
+      "description": "MCP (Model Context Protocol) server. Exposes .memo/index via JSON-RPC 2.0 over stdio. Tools: memo_list_keys, memo_get_value with bracket-notation path parsing.",
+      "interfaces": "Serve(workDir) starts server. NewServer(workDir), Run(), Close(). ListKeys(indexDir, path), GetValue(indexDir, path). ParsePath(path) parses [file][key][index] notation.",
       "internal": {
         "submodules": [
           {
             "name": "server",
-            "description": "MCP stdio server handling JSON-RPC 2.0 protocol. Implements initialize, notifications/initialized, tools/list, and tools/call methods. Returns server capabilities and tool definitions with embedded LLM guidance (schemaDesc + whenToUse). Checks analysis status and adds warning to tool responses when analysis is in progress. Logs all requests and responses to .memo/.history via HistoryLogger.",
-            "interfaces": "NewServer(workDir) creates server with indexDir, memoDir, and HistoryLogger. Run() starts event loop reading newline-delimited JSON from stdin. tools() returns Tool definitions with schemas. getStatus() reads .memo/status.json. handleToolCall() checks status and adds Warning field to ToolCallResult if status is 'analyzing'. HistoryLogger provides LogRequest, LogResponse, LogError, LogInfo, LogDebug methods."
+            "description": "JSON-RPC 2.0 server handling initialize, tools/list, tools/call methods. Logs to .memo/.history.",
+            "interfaces": "NewServer(), Run(), handleRequest(), handleToolCall(), tools() returns tool definitions with whenToUse guidance"
           },
           {
             "name": "query",
-            "description": "Path parser (state machine) and query executor. Parses bracket notation paths like [arch][modules][0][name], validates against allowed files (arch, interface, stories, issues), supports escape sequences for special characters, and traverses JSON data structures.",
-            "interfaces": "ParsePath(path) parses and validates path, returns file name and PathSegment slice. ListKeys(indexDir, path) returns ListKeysResult with type/keys/length. GetValue(indexDir, path) returns GetValueResult with JSON string. validateKey(key) checks key length and control characters. traverse(data, segments) navigates JSON structure. loadFile(indexDir, file) loads and parses JSON file."
+            "description": "Path parser and query executor. State machine for bracket notation, validates against allowed files.",
+            "interfaces": "ParsePath(path) → file, segments, err. ListKeys(), GetValue(). traverse() navigates JSON. validateKey() security check."
           }
         ],
-        "relationships": "server → query: handleToolCall() uses ListKeys() and GetValue() which internally call ParsePath(), loadFile(), and traverse()"
+        "relationships": "server → query for tool calls. server reads status.json to add stale-data warnings."
+      }
+    },
+    {
+      "name": "internal",
+      "description": "Shared utilities package. Logging with levels, LineBuffer for streaming output, HistoryLogger for debugging, auto-update checker.",
+      "interfaces": "SetLogLevel(), LogError/LogNotice/LogInfo/LogDebug(). NewLineBuffer(timeout), Write(), Flush(). NewHistoryLogger(), Log(), LogError/Info/Debug(), Close(). CheckUpdate(version), CheckUpdateAsync(version).",
+      "internal": {
+        "submodules": [
+          {
+            "name": "log",
+            "description": "Logging with 4 levels (error/notice/info/debug). Global historyLog integration. LineBuffer for clean streaming output.",
+            "interfaces": "SetLogLevel(), Log*() functions. InitHistoryLogger(), CloseHistoryLogger(). NewLineBuffer(), Write(), Flush(force)"
+          },
+          {
+            "name": "history",
+            "description": "HistoryLogger writes JSONL to .memo/.history for debugging. Thread-safe with sequence numbers.",
+            "interfaces": "NewHistoryLogger(memoDir, source), Log(entry), LogError/Info/Debug(), Close()"
+          },
+          {
+            "name": "updater",
+            "description": "Auto-update checker via GitHub API. Async check with 2s timeout, semver comparison.",
+            "interfaces": "CheckUpdate(currentVersion), CheckUpdateAsync(version). UpdateInfo struct with LatestVersion, UpdateCommand"
+          }
+        ],
+        "relationships": "log uses history for persistent logging. updater is standalone."
       }
     }
   ],
-  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> config\n  main --> watcher\n  main --> analyser\n  main --> mcp\n  main --> log\n  main --> lock\n  main --> status\n  config --> log\n  watcher --> log\n  analyser --> config\n  analyser --> validator\n  analyser --> log\n  analyser --> status\n  analyser --> prompts[prompts/*.md]\n  analyser --> kimi-agent-sdk\n  validator --> gojsonschema\n  watcher --> fsnotify\n  mcp --> .memo/index\n  mcp --> status\n  log --> mcp[mcp.HistoryLogger]\n```\n\n## Directory Organization\n\n- **prompts/** - Embedded prompt templates used by the analyser (context.md, analyse.md, feedback.md)\n- **spec/** - Design specification documents for features and architecture decisions\n- **mcp/** - MCP server package for read-only index queries\n- **testdata/** - Test fixtures\n\n## Output Files\n\n- **.memo/index/** - The four JSON documentation files (arch, interface, stories, issues)\n- **.memo/mcp.json** - Local MCP config for watcher sessions (prevents infinite recursion)\n- **.memo/watcher.lock** - flock file for single-instance enforcement\n- **.memo/status.json** - Analysis status (idle/analyzing)\n- **.memo/.history** - JSONL log of MCP requests/responses and watcher events\n- **.memo/.gitignore** - Excludes runtime files from version control\n\n## Notes\n\n- **main** is the orchestrator that wires everything together and selects mode (watch/once/mcp)\n- **watcher** operates independently, calling the onChange callback when files change\n- **analyser** is the core logic that invokes the AI agent and validates output\n- **validator** provides schema validation to ensure AI output is correct\n- **log** provides logging plus LineBuffer for streaming output handling\n- **mcp** provides read-only query interface to the index via MCP protocol\n- **lock** ensures only one watcher runs per directory using flock\n- **status** signals analysis state to MCP clients via .memo/status.json\n- External dependencies: fsnotify (file watching), gojsonschema (validation), kimi-agent-sdk (AI agent), gopkg.in/yaml.v3 (config parsing)"
+  "relationships": "## Module Dependencies\n\n```mermaid\ngraph TD\n  main --> cmd\n  cmd --> analyzer\n  cmd --> mcp\n  cmd --> internal\n  analyzer --> internal\n  mcp --> internal\n  analyzer --> kimi-agent-sdk\n  analyzer --> fsnotify\n  analyzer --> gojsonschema\n  mcp --> .memo/index\n```\n\n## Data Flow\n\n1. **Watch/Scan mode**: cmd/watch.go or cmd/scan.go → analyzer.Watcher → analyzer.Analyser → kimi-agent-sdk → .memo/index/*.json\n2. **MCP mode**: cmd/mcp.go → mcp.Server → mcp.query → .memo/index/*.json\n\n## Directory Structure\n\n- `cmd/` - CLI commands (watch, scan, mcp)\n- `analyzer/` - Core analysis logic\n- `mcp/` - MCP server\n- `internal/` - Shared utilities\n- `analyzer/prompts/` - Embedded AI prompt templates\n- `tests/` - Test files organized by package"
 }

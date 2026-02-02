@@ -2,39 +2,39 @@
   "external": [
     {
       "type": "cli",
-      "name": "--path",
-      "params": "string: path to directory to watch",
-      "description": "Specifies the directory to watch for file changes. Defaults to current working directory if not provided."
+      "name": "memo watch",
+      "params": "-p/--path <dir>, -c/--config <file>, --skip-scan, --log-level <level>",
+      "description": "Default command. Continuously monitors file changes and updates .memo/index. Use --skip-scan to skip initial full scan when index is already up-to-date."
     },
     {
       "type": "cli",
-      "name": "--config",
-      "params": "string: path to YAML config file (default: config.yaml)",
-      "description": "Specifies the configuration file location. Config includes agent settings, watch settings, and log level."
+      "name": "memo scan",
+      "params": "-p/--path <dir>, -c/--config <file>, --log-level <level>",
+      "description": "One-shot mode: performs full scan, triggers analysis, then exits. Useful for CI/CD pipelines, pre-commit hooks, or initial setup."
+    },
+    {
+      "type": "cli",
+      "name": "memo mcp",
+      "params": "-p/--path <dir>, --log-level <level>",
+      "description": "Starts MCP (Model Context Protocol) server over stdio. Provides read-only JSON path query access to .memo/index files. Requires existing index (run watch/scan first)."
     },
     {
       "type": "cli",
       "name": "--version",
-      "params": "none (boolean flag)",
+      "params": "none",
       "description": "Prints the version string and exits. Version is injected at build time via ldflags."
     },
     {
       "type": "cli",
-      "name": "--once",
-      "params": "none (boolean flag)",
-      "description": "Runs in one-shot mode: performs initial scan, triggers analysis, then exits without entering watch mode. Useful for CI/CD pipelines, pre-commit hooks, or generating documentation without a background process."
-    },
-    {
-      "type": "cli",
-      "name": "--mcp",
-      "params": "none (boolean flag)",
-      "description": "Runs as MCP (Model Context Protocol) server mode. Provides read-only JSON path query access to .memo/index files via stdio-based JSON-RPC 2.0 protocol. Requires existing index (created by watcher mode). Does NOT create or update the index."
+      "name": "-p/--path",
+      "params": "string: path to directory (default: current working directory)",
+      "description": "Global flag specifying the target directory. Works with all subcommands."
     },
     {
       "type": "cli",
       "name": "--log-level",
       "params": "string: error, notice, info, or debug",
-      "description": "Overrides the log level from config file. Takes precedence over config.yaml log_level setting."
+      "description": "Global flag that overrides log level from config file."
     },
     {
       "type": "filesystem",
@@ -51,196 +51,118 @@
     {
       "type": "filesystem",
       "name": ".memo/mcp.json",
-      "params": "JSON file with MCP server configurations (default: empty {})",
-      "description": "Local MCP configuration file for watcher sessions. Created automatically by initIndex() to prevent loading ~/.kimi/mcp.json (which may contain memo itself, causing infinite recursion). Users can customize this file to add MCP servers for watcher sessions."
-    },
-    {
-      "type": "filesystem",
-      "name": ".gitignore",
-      "params": "standard gitignore format",
-      "description": "If present in watched directory, patterns are merged into ignore_patterns to avoid watching ignored files."
-    },
-    {
-      "type": "filesystem",
-      "name": ".memo/watcher.lock",
-      "params": "Lock file containing PID of running watcher",
-      "description": "Exclusive lock file using flock to ensure only one watcher process runs per directory. Contains PID for debugging. Lock is automatically released when process exits or crashes."
+      "params": "JSON file with MCP server configurations",
+      "description": "Local MCP configuration file for watcher sessions. Created automatically to prevent loading ~/.kimi/mcp.json (which may contain memo itself, causing infinite recursion)."
     },
     {
       "type": "filesystem",
       "name": ".memo/status.json",
       "params": "JSON: {status: 'idle'|'analyzing', since?: ISO timestamp}",
-      "description": "Analysis status file read by MCP server. When status is 'analyzing', MCP responses include a warning that data may be stale. The 'since' field indicates when analysis started."
+      "description": "Analysis status file read by MCP server. When status is 'analyzing', MCP responses include a warning that data may be stale."
     },
     {
       "type": "filesystem",
       "name": ".memo/.history",
       "params": "JSONL file with log entries",
-      "description": "Debug log file containing MCP requests/responses and watcher events. Each line is a JSON object with seq, ts, src (mcp/watcher), type (request/response/info/debug/error), and relevant data fields."
-    },
-    {
-      "type": "filesystem",
-      "name": ".memo/.gitignore",
-      "params": "gitignore format listing runtime files",
-      "description": "Created by initIndex() to exclude runtime files (watcher.lock, status.json, .history) from version control while allowing index/*.json to be committed."
+      "description": "Debug log file containing MCP requests/responses and watcher events. Each line is a JSON object with seq, ts, src (mcp/watcher), type, and relevant data fields."
     },
     {
       "type": "rpc",
       "name": "memo_list_keys",
       "params": "path: string - JSON path like [arch][modules][0]",
-      "description": "MCP tool that lists available keys at a path in .memo/index JSON files. Returns {type: 'dict'|'list', keys?: [...], length?: N}. For dicts returns keys array, for lists returns length."
+      "description": "MCP tool that lists available keys at a path in .memo/index JSON files. Returns {type: 'dict'|'list', keys?: [...], length?: N}."
     },
     {
       "type": "rpc",
       "name": "memo_get_value",
       "params": "path: string - JSON path like [arch][modules][0][name]",
-      "description": "MCP tool that gets the JSON value at a path in .memo/index files. Returns {value: '<JSON string>'}. Supports traversing nested objects and arrays."
+      "description": "MCP tool that gets the JSON value at a path in .memo/index files. Returns {value: '<JSON string>'}."
     }
   ],
   "internal": [
     {
       "type": "callback",
-      "name": "Watcher.onChange(files []string)",
-      "params": "files: list of absolute paths to changed files",
-      "description": "Callback function passed to NewWatcher. Called with batched file changes after debounce period expires or max-wait time is reached."
-    },
-    {
-      "type": "callback",
-      "name": "Watcher.Flush()",
+      "name": "cmd.Execute() error",
       "params": "none",
-      "description": "Processes pending file changes with concurrent analysis guard. Uses non-blocking semaphore acquisition via capacity-1 channel: if analysis is already running, the flush returns immediately (files remain in pending for next timer). If acquired, stops both debounce and max-wait timers, collects pending files, calls onChange callback. Semaphore is released via defer after analysis completes. Called by internal timers, also public for once-mode support."
+      "description": "Entry point for CLI. Runs root command which dispatches to watch/scan/mcp subcommands."
     },
     {
       "type": "callback",
-      "name": "generateSessionID(workDir string) string",
-      "params": "workDir: absolute path to the project directory",
-      "description": "Creates a deterministic session ID based on working directory path. Uses SHA256 hash of workDir, takes first 8 hex chars, returns 'memo-<hash>' format (e.g., 'memo-a7c3f2b1'). Same project always gets same session ID."
+      "name": "cmd.SetVersion(v string)",
+      "params": "v: version string",
+      "description": "Sets version string displayed in --version and banner."
     },
     {
       "type": "callback",
-      "name": "toRelativePaths(files []string, workDir string) []string",
-      "params": "files: list of absolute file paths, workDir: base directory",
-      "description": "Converts absolute file paths to relative paths based on workDir. Uses filepath.Rel() for each path. Falls back to absolute path if conversion fails. Used to reduce token usage in prompts."
+      "name": "cmd.LoadConfig(path string) (*Config, error)",
+      "params": "path: YAML config file path",
+      "description": "Loads config from YAML file. Returns nil Config (not error) if file not found."
     },
     {
       "type": "callback",
-      "name": "splitIntoBatches(files []string, threshold int) [][]string",
-      "params": "files: list of relative file paths, threshold: max files per batch (default 100)",
-      "description": "Splits files into batches using recursive directory-based grouping. If count <= threshold, returns single batch. Otherwise groups by top-level directory, then recursively splits directories that exceed threshold. Keeps related files together."
+      "name": "analyzer.NewAnalyser(agentCfg AgentConfig, workDir string) *Analyser",
+      "params": "agentCfg: has APIKey and Model; workDir: project root",
+      "description": "Creates new Analyser. Uses embedded prompts/*.md for AI prompts."
     },
     {
       "type": "callback",
-      "name": "Analyser.Analyse(ctx, changedFiles []string)",
-      "params": "ctx: context for cancellation, changedFiles: list of absolute file paths",
-      "description": "Main analysis entry point with batching support. Converts absolute paths to relative via toRelativePaths(), splits files into batches via splitIntoBatches() when count exceeds maxFilesPerBatch (100), then processes each batch sequentially via analyseBatch(). Sets status to 'analyzing' at start and 'idle' at end."
+      "name": "analyzer.Analyser.Analyse(ctx context.Context, files []string) error",
+      "params": "ctx: context for cancellation; files: absolute file paths",
+      "description": "Analyzes files in batches. Each batch: run AI prompt → validate JSON → retry up to 5x on validation failure."
     },
     {
       "type": "callback",
-      "name": "Analyser.analyseBatch(ctx, files []string, batchNum, totalBatches int) error",
-      "params": "ctx: context, files: relative file paths for this batch, batchNum/totalBatches: batch position info",
-      "description": "Processes one batch of files. Creates kimi-agent-sdk session with local MCP config (.memo/mcp.json) and deterministic session ID. Adds batch info to prompt ('Batch X of Y') when multiple batches. Runs validation loop with up to 5 retries on failure."
+      "name": "analyzer.NewWatcher(root string, ignorePatterns []string, debounce, maxWait time.Duration, onChange func([]string)) (*Watcher, error)",
+      "params": "root: directory to watch; ignorePatterns: glob patterns; debounce/maxWait: timing; onChange: callback",
+      "description": "Creates filesystem watcher with fsnotify. debounce: quiet period before triggering. maxWait: maximum delay."
     },
     {
       "type": "callback",
-      "name": "Analyser.runPrompt(ctx, session, prompt string) error",
-      "params": "ctx: context, session: agent session, prompt: text to send",
-      "description": "Sends a prompt to the agent session and processes the streamed response. Uses LineBuffer for buffering output, handles ApprovalRequest (auto-approve), ContentPart (text output), and StatusUpdate (step completion) messages."
+      "name": "analyzer.Watcher.Flush()",
+      "params": "none",
+      "description": "Forces immediate analysis of pending files with semaphore guard. If analysis already running, returns immediately."
     },
     {
       "type": "callback",
-      "name": "ValidateIndex(indexDir string) ValidationResult",
-      "params": "indexDir: path to .memo/index directory",
-      "description": "Validates all four JSON files against their schemas. Returns Valid=true if all pass, or list of error strings."
+      "name": "analyzer.ValidateIndex(indexDir string) (*ValidationResult, error)",
+      "params": "indexDir: path to .memo/index",
+      "description": "Validates all JSON files against embedded schemas. Returns detailed validation errors."
     },
     {
       "type": "callback",
-      "name": "Config.MergeGitignore(workDir string) error",
-      "params": "workDir: path to directory containing .gitignore",
-      "description": "Loads and parses .gitignore, merges unique patterns into Config.Watch.IgnorePatterns. Skips if no .gitignore exists."
-    },
-    {
-      "type": "callback",
-      "name": "NewLineBuffer(timeout time.Duration) *LineBuffer",
-      "params": "timeout: duration to wait before force-flushing incomplete lines",
-      "description": "Creates a LineBuffer that accumulates streamed text and flushes on newlines or timeout. Used by runPrompt to produce clean debug output."
-    },
-    {
-      "type": "callback",
-      "name": "LineBuffer.Flush(force bool) string",
-      "params": "force: if true, flush all content; if false, only flush complete lines or on timeout",
-      "description": "Returns buffered content ready for output. When force=false, buffers incomplete lines until newline arrives or timeout expires."
+      "name": "analyzer.TryLock(memoDir string) (*os.File, error)",
+      "params": "memoDir: path to .memo directory",
+      "description": "Acquires exclusive lock on .memo/watcher.lock. Platform-specific: flock (Unix) or LockFileEx (Windows)."
     },
     {
       "type": "callback",
       "name": "mcp.Serve(workDir string) error",
-      "params": "workDir: path to project root containing .memo/index",
-      "description": "Starts the MCP server and blocks. Reads JSON-RPC 2.0 requests from stdin, dispatches to tool handlers, writes responses to stdout. Called by main when --mcp flag is set."
+      "params": "workDir: project root with .memo/index",
+      "description": "Starts MCP server over stdio. Blocks until EOF. Handles JSON-RPC 2.0 requests."
     },
     {
       "type": "callback",
-      "name": "mcp.ParsePath(path string) (file, segments, error)",
-      "params": "path: bracket-notation path like [arch][modules][0]",
-      "description": "State machine parser for JSON paths. Validates file name (must be arch/interface/stories/issues), supports escape sequences (\\[, \\], \\\\), returns file name and PathSegment slice for traversal."
+      "name": "mcp.ParsePath(path string) (file string, segments []string, err error)",
+      "params": "path: bracket notation like [arch][modules][0]",
+      "description": "State machine parser for JSON paths. Validates file name against allowed list, supports escape sequences."
     },
     {
       "type": "callback",
-      "name": "mcp.ListKeys(indexDir, path string) (*ListKeysResult, error)",
-      "params": "indexDir: path to .memo/index, path: bracket-notation path",
-      "description": "Returns type (dict/list), keys for dicts or length for lists at the given path. Used by memo_list_keys tool."
+      "name": "internal.NewHistoryLogger(memoDir, source string) (*HistoryLogger, error)",
+      "params": "memoDir: .memo directory; source: 'mcp' or 'watcher'",
+      "description": "Creates logger writing JSONL to .memo/.history. Thread-safe with sequence numbers."
     },
     {
       "type": "callback",
-      "name": "mcp.GetValue(indexDir, path string) (*GetValueResult, error)",
-      "params": "indexDir: path to .memo/index, path: bracket-notation path",
-      "description": "Returns JSON-marshaled value at the given path. Used by memo_get_value tool."
+      "name": "internal.CheckUpdateAsync(currentVersion string) <-chan *UpdateInfo",
+      "params": "currentVersion: semver string",
+      "description": "Async update check via GitHub API with 2s timeout. Returns channel that receives UpdateInfo or nil."
     },
     {
       "type": "callback",
-      "name": "mcp.Server.getStatus() Status",
-      "params": "none",
-      "description": "Reads .memo/status.json to check analysis status. Returns Status with 'idle' or 'analyzing' and optional 'since' timestamp. Called by handleToolCall() to add warning to responses when analysis is in progress."
-    },
-    {
-      "type": "callback",
-      "name": "mcp.NewHistoryLogger(memoDir, source string) (*HistoryLogger, error)",
-      "params": "memoDir: path to .memo directory, source: identifier (mcp or watcher)",
-      "description": "Creates a HistoryLogger that appends JSONL entries to .memo/.history file. Each entry has seq, ts, src, type, and context-specific fields."
-    },
-    {
-      "type": "callback",
-      "name": "TryLock(memoDir string) (*os.File, error)",
-      "params": "memoDir: path to .memo directory",
-      "description": "Attempts to acquire exclusive flock on .memo/watcher.lock. Returns file handle if successful. Returns error 'another watcher is already running' if lock held by another process. Writes PID to lock file for debugging. Called by main at watcher/once mode startup."
-    },
-    {
-      "type": "callback",
-      "name": "Unlock(f *os.File)",
-      "params": "f: lock file handle from TryLock",
-      "description": "Releases the flock and closes the file. Safe to call with nil. Called via defer after TryLock succeeds."
-    },
-    {
-      "type": "callback",
-      "name": "SetStatus(memoDir string, status string) error",
-      "params": "memoDir: path to .memo directory, status: 'idle' or 'analyzing'",
-      "description": "Writes status to .memo/status.json. When status is 'analyzing', includes current timestamp in 'since' field. Called by analyser at start (analyzing) and end (idle) of Analyse()."
-    },
-    {
-      "type": "callback",
-      "name": "GetStatus(memoDir string) Status",
-      "params": "memoDir: path to .memo directory",
-      "description": "Reads status from .memo/status.json. Returns Status{Status: 'idle'} if file doesn't exist or is invalid JSON. Called by MCP server to check if analysis is in progress."
-    },
-    {
-      "type": "callback",
-      "name": "InitHistoryLogger(memoDir string)",
-      "params": "memoDir: path to .memo directory",
-      "description": "Initializes the global watcher history logger (historyLog) by creating a HistoryLogger with source 'watcher'. Called by main at startup. Log functions (logError, logInfo, etc.) write to this logger."
-    },
-    {
-      "type": "callback",
-      "name": "CloseHistoryLogger()",
-      "params": "none",
-      "description": "Closes the global watcher history logger. Called via defer in main after InitHistoryLogger."
+      "name": "internal.SetLogLevel(level string)",
+      "params": "level: error, notice, info, or debug",
+      "description": "Sets global log level for LogError/LogNotice/LogInfo/LogDebug functions."
     }
   ]
 }
