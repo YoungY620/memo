@@ -1,6 +1,8 @@
 package analyzer
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +24,33 @@ type Watcher struct {
 	pending           map[string]struct{}
 	debounce, maxWait *time.Timer
 	sem               chan struct{} // capacity 1 semaphore for analysis guard
+}
+
+// describePathError extracts detailed information from filesystem errors (cross-platform)
+func describePathError(err error) (op, path, reason string) {
+	var pathErr *fs.PathError
+	if !errors.As(err, &pathErr) {
+		return "", "", err.Error()
+	}
+
+	op = pathErr.Op
+	path = pathErr.Path
+
+	// Use cross-platform error checks from io/fs package
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		reason = "no such file or directory (broken symlink?)"
+	case errors.Is(err, fs.ErrPermission):
+		reason = "permission denied"
+	case errors.Is(err, fs.ErrInvalid):
+		reason = "invalid argument"
+	case errors.Is(err, fs.ErrClosed):
+		reason = "file already closed"
+	default:
+		reason = pathErr.Err.Error()
+	}
+
+	return op, path, reason
 }
 
 func NewWatcher(root string, ignore []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
@@ -48,13 +77,22 @@ func NewWatcher(root string, ignore []string, debounceMs, maxWaitMs int, onChang
 
 func (w *Watcher) watchAll(dir string) error {
 	return filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
-		if err != nil || !d.IsDir() {
-			return err
+		if err != nil {
+			op, path, reason := describePathError(err)
+			internal.LogWarning("Skipping path: op=%s, path=%s, reason=%s", op, path, reason)
+			return nil
+		}
+		if !d.IsDir() {
+			return nil
 		}
 		if w.ignored(p) {
 			return filepath.SkipDir
 		}
-		return w.watcher.Add(p)
+		if err := w.watcher.Add(p); err != nil {
+			op, path, reason := describePathError(err)
+			internal.LogWarning("Cannot add watch: op=%s, path=%s, reason=%s", op, path, reason)
+		}
+		return nil
 	})
 }
 

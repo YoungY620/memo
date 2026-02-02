@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Log levels: error=0, notice=1, info=2, debug=3
+// Log levels: error=0, warning=1, info=2, debug=3
 var logLevel = 2 // default: info
 
 // Global history logger
@@ -19,7 +19,7 @@ func SetLogLevel(level string) {
 	switch strings.ToLower(level) {
 	case "error":
 		logLevel = 0
-	case "notice":
+	case "warning":
 		logLevel = 1
 	case "info":
 		logLevel = 2
@@ -59,10 +59,10 @@ func LogError(format string, v ...any) {
 	}
 }
 
-// LogNotice logs a notice message
-func LogNotice(format string, v ...any) {
+// LogWarning logs a warning message
+func LogWarning(format string, v ...any) {
 	if logLevel >= 1 {
-		log.Printf("[NOTICE] "+format, v...)
+		log.Printf("[WARNING] "+format, v...)
 	}
 	if historyLog != nil {
 		historyLog.LogInfo(format, v...)

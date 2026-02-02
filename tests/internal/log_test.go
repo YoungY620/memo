@@ -18,7 +18,7 @@ func TestSetLogLevel(t *testing.T) {
 	}{
 		{"error", "error"},
 		{"ERROR", "error"},
-		{"notice", "notice"},
+		{"warning", "warning"},
 		{"info", "info"},
 		{"debug", "debug"},
 		{"invalid", "info"}, // default fallback
@@ -41,7 +41,7 @@ func TestLogFunctions(t *testing.T) {
 
 	assert.NotPanics(t, func() {
 		internal.LogError("test error %s", "arg")
-		internal.LogNotice("test notice %s", "arg")
+		internal.LogWarning("test warning %s", "arg")
 		internal.LogInfo("test info %s", "arg")
 		internal.LogDebug("test debug %s", "arg")
 	})
