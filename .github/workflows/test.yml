@@ -1,0 +1,97 @@
+name: Tests
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore:
+      - 'v*'
+    paths:
+      # Go code
+      - '**/*.go'
+      # Dependencies
+      - 'go.mod'
+      - 'go.sum'
+      # Embedded content
+      - 'analyzer/prompts/**'
+      # Build config
+      - 'Makefile'
+      # This workflow
+      - '.github/workflows/test.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'analyzer/prompts/**'
+      - 'Makefile'
+      - '.github/workflows/test.yml'
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run golangci-lint
+        run: golangci-lint run --timeout=5m
+
+  test:
+    name: Test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            name: linux
+          - os: macos-latest
+            name: darwin
+          - os: windows-latest
+            name: windows
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run unit tests with coverage
+        shell: bash
+        run: go test -v -race -timeout 120s -tags testing -coverprofile=coverage.out -covermode=atomic ./tests/analyzer/... ./tests/internal/... ./tests/mcp/...
+
+      - name: Run integration tests
+        run: go test -v -race -timeout 300s -tags testing ./tests/integration/...
+
+      - name: Generate coverage report
+        shell: bash
+        run: go tool cover -func=coverage.out
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.name }}
+          path: coverage.out
+          retention-days: 7
