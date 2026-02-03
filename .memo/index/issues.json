@@ -5,8 +5,8 @@
       "title": "--mcp-with-watcher flag not implemented",
       "description": "The spec describes a flag to run MCP server alongside watcher in a single process, but this is not implemented. Currently watch and mcp are separate commands that cannot run together. This would be useful for editors that want both real-time updates and MCP queries.",
       "locations": [
-        {"file": "cmd/watch.go", "keyword": "runWatch", "line": 35},
-        {"file": "cmd/mcp.go", "keyword": "mcpCmd", "line": 15}
+        {"file": "cmd/watch.go", "keyword": "runWatch", "line": 37},
+        {"file": "cmd/mcp.go", "keyword": "mcpCmd", "line": 12}
       ]
     },
     {
@@ -14,7 +14,7 @@
       "title": "Periodic index rebuild (Future Belongs to Future) not implemented",
       "description": "The spec's Roadmap mentions 'Future Belongs to Future: Periodic index rebuild with fresh sessions for consistency.' This feature is not implemented - once the session ID is generated it's reused forever, which could lead to context drift over time.",
       "locations": [
-        {"file": "analyzer/analyser.go", "keyword": "generateSessionID", "line": 50}
+        {"file": "analyzer/analyser.go", "keyword": "generateSessionID", "line": 55}
       ]
     },
     {
@@ -22,16 +22,16 @@
       "title": "Session ID deterministic from workDir hash",
       "description": "The generateSessionID() function creates a deterministic session ID from workDir SHA256 hash (memo-<8-hex-chars>). This enables session reuse across analyses for context continuity, but may cause AI context drift if codebase changes significantly.",
       "locations": [
-        {"file": "analyzer/analyser.go", "keyword": "sessionID", "line": 25}
+        {"file": "analyzer/analyser.go", "keyword": "sessionPrefix", "line": 24}
       ]
     },
     {
-      "tags": ["robustness"],
-      "title": "No graceful shutdown handling in watcher",
-      "description": "The watcher's Run() loop exits on fsnotify errors but doesn't handle SIGINT/SIGTERM gracefully. The status might remain 'analyzing' in status.json if the process is killed during analysis.",
+      "tags": ["design-decision", "robustness"],
+      "title": "Graceful shutdown with signal handling",
+      "description": "Watch mode handles SIGINT/SIGTERM gracefully. cmd/watch.go sets up signal channel and waits for shutdown signal, ensuring status is reset to 'idle' on exit via defer statements.",
       "locations": [
-        {"file": "analyzer/watcher.go", "keyword": "Run", "line": 130},
-        {"file": "analyzer/status.go", "keyword": "SetStatus", "line": 20}
+        {"file": "cmd/watch.go", "keyword": "signal.Notify", "line": 135},
+        {"file": "cmd/watch.go", "keyword": "sigChan", "line": 134}
       ]
     },
     {
@@ -39,23 +39,81 @@
       "title": "History log file grows unbounded",
       "description": "The .memo/.history JSONL file is append-only with no rotation or size limit. For long-running watcher processes with frequent changes, this file could grow very large.",
       "locations": [
-        {"file": "internal/history.go", "keyword": "Log", "line": 45}
+        {"file": "internal/history.go", "keyword": "Log", "line": 46}
       ]
     },
     {
-      "tags": ["compromise"],
+      "tags": ["compromise", "will-be-resolved"],
       "title": "Ignore pattern matching is simplistic",
-      "description": "The ignored() function in watcher.go does simple string matching (HasPrefix for *.ext, Contains for paths). This doesn't support full gitignore glob patterns like **/*.log or negation patterns.",
+      "description": "The ignored() function in watcher.go does simple string matching (HasPrefix for *.ext, Contains for paths). This doesn't support full gitignore glob patterns like **/*.log or negation patterns. This will be resolved by the 'Support nested .gitignore files with hierarchical matching' roadmap item, which introduces GitignoreMatcher with full Git gitignore support via github.com/sabhiram/go-gitignore library.",
       "locations": [
-        {"file": "analyzer/watcher.go", "keyword": "ignored", "line": 116}
+        {"file": "analyzer/watcher.go", "keyword": "ignored", "line": 116},
+        {"file": "spec/feature-nested-gitignore.md", "keyword": "Match", "line": 182}
       ]
     },
     {
       "tags": ["design-decision", "robustness"],
       "title": "Watcher gracefully handles filesystem errors",
-      "description": "The analyzer/watcher.go has describePathError() helper that extracts detailed info from fs.PathError (op, path, reason). This handles broken symlinks, permission denied, etc. with warnings instead of failures.",
+      "description": "The analyzer/watcher.go has describePathError() helper that extracts detailed info from fs.PathError (op, path, reason). Uses io/fs package for cross-platform error detection (ErrNotExist, ErrPermission, etc.). Handles broken symlinks, permission denied, etc. with warnings instead of failures.",
       "locations": [
-        {"file": "analyzer/watcher.go", "keyword": "describePathError", "line": 29}
+        {"file": "analyzer/watcher.go", "keyword": "describePathError", "line": 30}
+      ]
+    },
+    {
+      "tags": ["design-decision", "architecture"],
+      "title": "Watcher monitors directories not individual files",
+      "description": "The watcher uses fsnotify to monitor directories, not individual files. During initialization, watchAll() walks the directory tree and calls watcher.Add() on each non-ignored directory. The 'pending' map is a temporary queue for changed files (used for batching), not a persistent list of monitored files. Key implications: (1) ignored() affects both initialization (returns SkipDir to prevent monitoring) and runtime (filters events), (2) ignored directories are completely unwatched - files in them never trigger events, (3) new directories created at runtime are dynamically added to monitoring if not ignored, (4) .gitignore files in already-ignored directories won't be detected (requires restart). This architecture is crucial for nested gitignore design: GitignoreMatcher must be built BEFORE watchAll() is called, so ignored directories are skipped correctly during initialization.",
+      "locations": [
+        {"file": "analyzer/watcher.go", "keyword": "watchAll", "line": 138},
+        {"file": "analyzer/watcher.go", "keyword": "pending", "line": 19}
+      ]
+    },
+    {
+      "tags": ["design-decision", "security"],
+      "title": "Local MCP config prevents infinite recursion",
+      "description": "The watcher creates .memo/mcp.json with empty {} to prevent kimi-agent-sdk from loading ~/.kimi/mcp.json (which may contain memo itself, causing infinite recursion when memo calls the AI agent).",
+      "locations": [
+        {"file": "cmd/common.go", "keyword": "mcp.json", "line": 37},
+        {"file": "analyzer/analyser.go", "keyword": "WithMCPConfigFile", "line": 175}
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Concurrent analysis guard via semaphore",
+      "description": "Watcher uses a capacity-1 channel as semaphore to prevent multiple concurrent analyses. Flush() does non-blocking acquire - if analysis is running, it skips flush and leaves files in pending set for next time.",
+      "locations": [
+        {"file": "analyzer/watcher.go", "keyword": "sem", "line": 26},
+        {"file": "analyzer/watcher.go", "keyword": "Flush", "line": 180}
+      ]
+    },
+    {
+      "tags": ["design-decision"],
+      "title": "Batch splitting by directory for large codebases",
+      "description": "When file count exceeds 100 (maxFilesPerBatch), splitIntoBatches() recursively groups files by top-level directory. This prevents context overflow when analyzing large codebases.",
+      "locations": [
+        {"file": "analyzer/analyser.go", "keyword": "splitIntoBatches", "line": 75},
+        {"file": "analyzer/analyser.go", "keyword": "maxFilesPerBatch", "line": 28}
+      ]
+    },
+    {
+      "tags": ["todo", "roadmap"],
+      "title": "Add source code location references to index files",
+      "description": "Finalized spec to add 'source' and 'refs' fields to index files for navigating from semantic index to source code. Changes: (1) arch.json modules/submodules get 'source' (dir/file) and optional 'refs', (2) interface.json entries get 'source' (file) and optional 'refs', (3) stories.json entries get 'source' (file array), (4) issues.json 'keyword' renamed to 'symbol' and 'line' becomes 'lines' supporting [start, end] ranges. Requires updating JSON schemas in analyzer/validator.go and AI prompts in analyzer/prompts/*.md.",
+      "locations": [
+        {"file": "spec/index-file-location-field.md", "keyword": "source", "line": 31},
+        {"file": "analyzer/validator.go", "keyword": "schemas", "line": 12}
+      ]
+    },
+    {
+      "tags": ["todo", "roadmap", "enhancement"],
+      "title": "Support nested .gitignore files with hierarchical matching",
+      "description": "Currently memo only reads root .gitignore, ignoring subdirectory .gitignore files. Comprehensive spec at spec/feature-nested-gitignore.md proposes implementation using github.com/sabhiram/go-gitignore library for full Git compatibility. Spec includes current implementation analysis showing watcher uses fsnotify to monitor directories (not files), with pending map as temporary queue for batching. Solution: (1) hierarchical matching - each directory's .gitignore stored separately, matched from file location upward, (2) full Git rules support including negation (!file), path rules (/root_only), recursive wildcards (**/foo), (3) dynamic .gitignore reload during watch mode, (4) new GitignoreMatcher struct in analyzer/gitignore.go with NewGitignoreMatcher/Match/AddGitignore/RemoveGitignore methods. Changes: add go-gitignore dependency, create analyzer/gitignore.go, replace analyzer/watcher.go ignorePatterns with matcher, delete cmd/config.go LoadGitignore/MergeGitignore, update cmd/common.go. Performance: <1μs per match with regex precompilation, ~50ms init for 1000 dirs. Critical constraint: GitignoreMatcher must be built BEFORE watchAll() is called. Limitation: .gitignore files created in already-ignored directories won't be detected (fsnotify limitation). Spec includes complete code patches, edge cases, and TODO checklist.",
+      "locations": [
+        {"file": "spec/feature-nested-gitignore.md", "keyword": "type GitignoreMatcher struct", "line": 228},
+        {"file": "spec/feature-nested-gitignore.md", "keyword": "func NewGitignoreMatcher", "line": 240},
+        {"file": "spec/feature-nested-gitignore.md", "keyword": "TODO", "line": 958},
+        {"file": "cmd/config.go", "keyword": "LoadGitignore", "line": 60},
+        {"file": "analyzer/watcher.go", "keyword": "ignorePatterns", "line": 22}
       ]
     }
   ]

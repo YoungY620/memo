@@ -13,7 +13,7 @@
     {
       "title": "MCP Mode: Agent Index Queries",
       "tags": ["mcp", "json-rpc", "stdio", "ai-agent", "query"],
-      "content": "AI agent runs 'memo mcp' via MCP integration. Server reads JSON-RPC requests from stdin, responds on stdout. Two tools available: memo_list_keys to navigate index structure, memo_get_value to retrieve specific data. Server adds warning if analysis is in progress.\n\nHappy path:\n1. cmd/mcp.go: mcpCmd validates .memo/index exists\n2. mcp/server.go: Serve() creates server, calls Run()\n3. mcp/server.go: Run() reads JSON-RPC from stdin\n4. mcp/server.go: handleRequest() dispatches to handlers\n5. mcp/query.go: ParsePath() parses [file][key][index] notation\n6. mcp/query.go: ListKeys()/GetValue() executes query\n7. mcp/server.go: writeResponse() sends result"
+      "content": "AI agent runs 'memo mcp' via MCP integration. Server reads JSON-RPC requests from stdin, responds on stdout. Two tools available: memo_list_keys to navigate index structure, memo_get_value to retrieve specific data. Server adds warning if analysis is in progress.\n\nHappy path:\n1. cmd/mcp.go: mcpCmd validates .memo/index exists\n2. mcp/server.go: Serve() creates server, calls Run()\n3. mcp/server.go: Run() reads JSON-RPC from stdin\n4. mcp/server.go: handleRequest() dispatches to handlers\n5. mcp/query.go: ParsePath() parses [file][key][index] notation\n6. mcp/query.go: ListKeys()/GetValue() executes query\n7. mcp/server.go: sendResponse() writes JSON result"
     },
     {
       "title": "Schema Validation with Retry",
@@ -39,6 +39,21 @@
       "title": "Cross-platform Filesystem Error Handling",
       "tags": ["cross-platform", "error-handling", "watcher"],
       "content": "Watcher handles filesystem errors gracefully across platforms (Windows, macOS, Linux). Uses io/fs package for cross-platform error detection (ErrNotExist, ErrPermission, etc.). When encountering errors like broken symlinks or permission issues, logs warning with detailed info (op, path, reason) and continues rather than failing.\n\nHappy path:\n1. analyzer/watcher.go: watchAll() walks directory tree\n2. On error: describePathError() extracts PathError details\n3. Uses errors.Is() with fs.ErrNotExist, fs.ErrPermission etc.\n4. LogWarning() with op, path, reason\n5. Continue processing other files/directories"
+    },
+    {
+      "title": "Graceful Shutdown",
+      "tags": ["shutdown", "signal", "cleanup"],
+      "content": "Watch mode handles SIGINT/SIGTERM gracefully. On startup, defers are set to reset status to 'idle' on exit. Signal channel is created and watched in parallel with watcher.Run(). When signal received, logs shutdown message and returns cleanly, allowing defers to run.\n\nHappy path:\n1. cmd/watch.go: runWatch() sets up defers for Unlock() and SetStatus('idle')\n2. signal.Notify(sigChan, SIGINT, SIGTERM)\n3. goroutine runs watcher.Run()\n4. Main goroutine waits on sigChan\n5. Signal received: log 'Shutting down...'\n6. Return triggers defers: status reset, lock released"
+    },
+    {
+      "title": "Large Codebase Batch Processing",
+      "tags": ["batch", "performance", "large-codebase"],
+      "content": "For codebases with >100 changed files, Analyse() splits files into batches by top-level directory. This prevents context overflow in AI analysis. Each batch is processed sequentially with its own prompt containing batch number info.\n\nHappy path:\n1. analyzer/analyser.go: Analyse() converts to relative paths\n2. splitIntoBatches() groups by directory if >100 files\n3. For each batch: analyseBatch() sends prompt with batch N of M info\n4. AI processes batch, updates index\n5. Validate, retry if needed\n6. Continue to next batch"
+    },
+    {
+      "title": "Watcher Directory-Based Monitoring",
+      "tags": ["watcher", "fsnotify", "architecture", "directory-monitoring"],
+      "content": "The watcher monitors directories via fsnotify, not individual files. This architecture has important implications for ignore patterns and performance.\n\nInitialization:\n1. NewWatcher() creates fsnotify.Watcher\n2. watchAll(root) walks directory tree with filepath.WalkDir\n3. For each directory encountered:\n   - Call ignored(dir) to check ignore patterns\n   - If ignored: return SkipDir (directory and all subdirectories completely unwatched)\n   - If not ignored: watcher.Add(dir) to monitor this directory\n4. Files are not individually monitored\n\nRuntime event handling:\n1. watcher.Run() receives fsnotify events for any file changes in monitored directories\n2. For each event:\n   - If path is ignored: skip (filter out event)\n   - If Create event + path is directory + not ignored: dynamically add directory to monitoring\n   - If Write/Create/Remove/Rename: add file to pending map\n3. pending map is temporary queue for batching, cleared after each Flush()\n\nDebouncing:\n1. add(file) adds to pending and resets 30s debounce timer\n2. First file also starts 5min maxWait timer\n3. When debounce fires (30s of quiet) or maxWait expires: Flush() processes all pending files\n\nKey limitations:\n- Already-ignored directories never receive events (even if .gitignore changes later)\n- New .gitignore in ignored directory won't be detected (requires restart)\n- Dynamic .gitignore updates only affect already-monitored directories"
     }
   ]
 }

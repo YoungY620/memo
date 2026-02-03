@@ -7,7 +7,7 @@
     },
     {
       "name": "cmd",
-      "description": "CLI command layer using Cobra framework. Defines three subcommands: watch (default), scan, and mcp. Handles configuration loading, directory initialization, and orchestrates analyzer/mcp packages.",
+      "description": "CLI command layer using Cobra framework. Defines three subcommands: watch (default), scan, and mcp. Handles configuration loading, directory initialization, signal handling, and orchestrates analyzer/mcp packages.",
       "interfaces": "Execute() runs root command. SetVersion(v) sets version. Exports Config types for YAML parsing. Uses analyzer and mcp packages.",
       "internal": {
         "submodules": [
@@ -18,8 +18,8 @@
           },
           {
             "name": "watch",
-            "description": "Watch mode - monitors file changes continuously, updates index on change",
-            "interfaces": "watchCmd with --config, --skip-scan flags. Calls analyzer.NewWatcher, analyzer.NewAnalyser, analyzer.PrintBanner"
+            "description": "Watch mode - monitors file changes continuously, updates index on change. Handles graceful shutdown via SIGINT/SIGTERM.",
+            "interfaces": "watchCmd with --config, --skip-scan flags. Calls analyzer.NewWatcher, analyzer.NewAnalyser, analyzer.PrintBanner. Sets up signal handling."
           },
           {
             "name": "scan",
@@ -33,8 +33,8 @@
           },
           {
             "name": "config",
-            "description": "Configuration types and loading from YAML file with defaults",
-            "interfaces": "LoadConfig(path), Config.MergeGitignore(workDir), LoadGitignore(workDir)"
+            "description": "Configuration types and loading from YAML file with defaults. Supports .gitignore pattern merging.",
+            "interfaces": "LoadConfig(path), Config.MergeGitignore(workDir), LoadGitignore(workDir), normalizeGitignorePattern()"
           },
           {
             "name": "common",
@@ -53,33 +53,38 @@
         "submodules": [
           {
             "name": "analyser",
-            "description": "AI-powered analysis using kimi-agent-sdk. Batches files, sends prompts, validates output with retry loop (max 5 attempts).",
-            "interfaces": "NewAnalyser(), Analyse(), analyseBatch(), runPrompt(). Uses embedded prompts/*.md"
+            "description": "AI-powered analysis using kimi-agent-sdk. Batches files by directory (max 100), sends prompts, validates output with retry loop (max 5 attempts).",
+            "interfaces": "NewAnalyser(), Analyse(), analyseBatch(), runPrompt(), splitIntoBatches(), toRelativePaths(). Uses embedded prompts/*.md"
           },
           {
             "name": "watcher",
             "description": "Filesystem watcher using fsnotify. Debounce/max-wait batching, concurrent analysis guard via semaphore. Robust error handling with describePathError() for broken symlinks and permission issues.",
-            "interfaces": "NewWatcher(), ScanAll(), Flush(), Run(), Close(), add(), ignored(), describePathError()"
+            "interfaces": "NewWatcher(), ScanAll(), Flush(), Run(), Close(), add(), ignored(), describePathError(), watchAll()"
           },
           {
             "name": "validator",
-            "description": "JSON schema validation for .memo/index files using gojsonschema",
-            "interfaces": "ValidateIndex(indexDir) → ValidationResult, FormatValidationErrors()"
+            "description": "JSON schema validation for .memo/index files using gojsonschema. Embedded schemas for arch, interface, stories, issues.",
+            "interfaces": "ValidateIndex(indexDir) → ValidationResult, FormatValidationErrors(). schemas map contains JSON Schema definitions."
           },
           {
             "name": "lock",
-            "description": "Single-instance lock using flock (Unix) or LockFileEx (Windows)",
-            "interfaces": "TryLock(memoDir) → *os.File, Unlock(f). Platform-specific via build tags"
+            "description": "Single-instance lock using flock (Unix) or LockFileEx (Windows). Platform-specific via build tags.",
+            "interfaces": "TryLock(memoDir) → *os.File, Unlock(f). Writes PID to lock file."
           },
           {
             "name": "status",
             "description": "Analysis status tracking via .memo/status.json",
-            "interfaces": "SetStatus(memoDir, status), GetStatus(memoDir) → Status"
+            "interfaces": "SetStatus(memoDir, status), GetStatus(memoDir) → Status. Status has 'idle' or 'analyzing' with optional 'since' timestamp."
           },
           {
             "name": "banner",
-            "description": "Startup banner with ASCII art, version, greeting, update notice. Adapts to terminal width.",
-            "interfaces": "PrintBanner(BannerOptions). BannerOptions has WorkDir, Version, UpdateInfo"
+            "description": "Startup banner with ASCII art, version, greeting, update notice. Adapts to terminal width (full/compact/minimal).",
+            "interfaces": "PrintBanner(BannerOptions). BannerOptions has WorkDir, Version, UpdateInfo. Helper: runeWidth(), truncatePath(), getGreeting()"
+          },
+          {
+            "name": "export_testing",
+            "description": "Exports internal functions for external test packages. Only compiled with -tags testing.",
+            "interfaces": "Exports: GenerateSessionID, ToRelativePaths, SplitIntoBatches, LoadPrompt, GetGreeting, RuneWidth, TruncatePath"
           }
         ],
         "relationships": "watcher detects changes → analyser processes batches → validator checks output. lock ensures single instance. status signals progress to MCP. banner displays on startup."
@@ -93,13 +98,18 @@
         "submodules": [
           {
             "name": "server",
-            "description": "JSON-RPC 2.0 server handling initialize, tools/list, tools/call methods. Logs to .memo/.history.",
-            "interfaces": "NewServer(), Run(), handleRequest(), handleToolCall(), tools() returns tool definitions with whenToUse guidance"
+            "description": "JSON-RPC 2.0 server handling initialize, notifications/initialized, tools/list, tools/call methods. Logs to .memo/.history. Returns stale-data warning if analysis in progress.",
+            "interfaces": "NewServer(), Run(), Close(), handleRequest(), handleToolCall(), tools() returns tool definitions with whenToUse guidance, getStatus()"
           },
           {
             "name": "query",
-            "description": "Path parser and query executor. State machine for bracket notation, validates against allowed files.",
-            "interfaces": "ParsePath(path) → file, segments, err. ListKeys(), GetValue(). traverse() navigates JSON. validateKey() security check."
+            "description": "Path parser and query executor. State machine for bracket notation with escape support, validates against allowed files whitelist.",
+            "interfaces": "ParsePath(path) → file, segments, err. ListKeys(), GetValue(). traverse() navigates JSON. validateKey() checks length and control chars."
+          },
+          {
+            "name": "export_testing",
+            "description": "Exports internal methods for external test packages. Only compiled with -tags testing.",
+            "interfaces": "Exports: Server.GetStatusFromServer()"
           }
         ],
         "relationships": "server receives JSON-RPC → dispatches to query functions → returns results. Checks status.json for stale-data warnings."
@@ -118,18 +128,18 @@
           },
           {
             "name": "history",
-            "description": "HistoryLogger writes JSONL to .memo/.history for debugging. Thread-safe with sequence numbers.",
-            "interfaces": "NewHistoryLogger(memoDir, source), Log(entry), LogError/Info/Debug(), Close()"
+            "description": "HistoryLogger writes JSONL to .memo/.history for debugging. Thread-safe with mutex and sequence numbers.",
+            "interfaces": "NewHistoryLogger(memoDir, source), Log(entry), LogError/Info/Debug(), Close(). HistoryEntry struct with Seq, Timestamp, Source, Type, etc."
           },
           {
             "name": "updater",
-            "description": "Auto-update checker via GitHub API. Async check with 2s timeout, semver comparison.",
-            "interfaces": "CheckUpdate(currentVersion), CheckUpdateAsync(version). Returns UpdateInfo with LatestVersion, UpdateCommand"
+            "description": "Auto-update checker via GitHub API. Async check with 2s timeout, semver comparison. Platform-aware install commands.",
+            "interfaces": "CheckUpdate(currentVersion), CheckUpdateAsync(version). Returns UpdateInfo with LatestVersion, UpdateCommand. getUpdateCommand() detects homebrew/scoop."
           }
         ],
         "relationships": "log uses history for persistent logging. updater is standalone, called from cmd/watch and cmd/scan."
       }
     }
   ],
-  "relationships": "main → cmd.Execute() → watch/scan/mcp commands.\n\nWatch/Scan mode: cmd → analyzer.Watcher → analyzer.Analyser → kimi-agent-sdk → .memo/index/*.json\n\nMCP mode: cmd → mcp.Serve() → mcp.Server → mcp.query → .memo/index/*.json\n\nShared: internal/log, internal/history used by all packages. internal/updater used by cmd."
+  "relationships": "main → cmd.Execute() → watch/scan/mcp commands.\n\nWatch/Scan mode: cmd → analyzer.Watcher → analyzer.Analyser → kimi-agent-sdk → .memo/index/*.json\n\nMCP mode: cmd → mcp.Serve() → mcp.Server → mcp.query → .memo/index/*.json\n\nShared: internal/log, internal/history used by all packages. internal/updater used by cmd.\n\n```mermaid\ngraph TD\n    main --> cmd\n    cmd --> watch[cmd/watch]\n    cmd --> scan[cmd/scan]\n    cmd --> mcpcmd[cmd/mcp]\n    watch --> analyzer\n    scan --> analyzer\n    mcpcmd --> mcp\n    analyzer --> internal\n    mcp --> internal\n```"
 }
