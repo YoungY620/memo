@@ -111,7 +111,7 @@
       "locations": [
         {"file": "spec/feature-nested-gitignore.md", "keyword": "type GitignoreMatcher struct", "line": 228},
         {"file": "spec/feature-nested-gitignore.md", "keyword": "func NewGitignoreMatcher", "line": 240},
-        {"file": "spec/feature-nested-gitignore.md", "keyword": "TODO", "line": 958},
+        {"file": "spec/feature-nested-gitignore.md", "keyword": "TODO", "line": 950},
         {"file": "cmd/config.go", "keyword": "LoadGitignore", "line": 60},
         {"file": "analyzer/watcher.go", "keyword": "ignorePatterns", "line": 22}
       ]

@@ -2,6 +2,8 @@
 
 支持任意子目录中的 `.gitignore` 文件，完整实现 Git 的所有 gitignore 规则。
 
+**⚠️ 破坏性变更：直接修改 `NewWatcher` 接口，不考虑向后兼容。**
+
 ## 现有实现分析
 
 ### Watcher 的核心机制
@@ -417,8 +419,7 @@ project/
 
 type Watcher struct {
     debounceMs, maxWaitMs int
--   ignorePatterns        []string
-+   matcher               *GitignoreMatcher
+    matcher               *GitignoreMatcher  // 直接替换 ignorePatterns
     onChange              func([]string)
     watcher               *fsnotify.Watcher
     rootPath              string
@@ -433,8 +434,7 @@ type Watcher struct {
 ### 修改初始化逻辑
 
 ```go
--func NewWatcher(root string, ignore []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
-+func NewWatcher(root string, globalPatterns []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
+func NewWatcher(root string, globalPatterns []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
     fsw, err := fsnotify.NewWatcher()
     if err != nil {
         return nil, err
@@ -471,18 +471,7 @@ type Watcher struct {
 
 ```go
 func (w *Watcher) ignored(path string) bool {
--   rel, _ := filepath.Rel(w.rootPath, path)
--   base := filepath.Base(path)
--   for _, p := range w.ignorePatterns {
--       if strings.HasPrefix(p, "*.") && strings.HasSuffix(path, p[1:]) {
--           return true
--       }
--       if strings.Contains(rel, p) || base == p {
--           return true
--       }
--   }
--   return false
-+   return w.matcher.Match(path)
+    return w.matcher.Match(path)
 }
 ```
 
@@ -641,8 +630,10 @@ require (
 | `analyzer/watcher.go` | 修改 | 在 `Run()` 中监听 `.gitignore` 变化 |
 | `cmd/config.go` | 删除 | 删除 `LoadGitignore`, `MergeGitignore` |
 | `cmd/common.go` | 修改 | 移除 `MergeGitignore` 调用 |
-| `cmd/scan.go` | 不变 | 接口兼容（只是参数名称改变） |
-| `cmd/watch.go` | 不变 | 接口兼容 |
+| `cmd/scan.go` | 修改 | 更新 `NewWatcher` 调用 |
+| `cmd/watch.go` | 修改 | 更新 `NewWatcher` 调用 |
+
+**注意：不考虑向后兼容，直接破坏性修改接口。**
 
 ## Patch
 
@@ -797,8 +788,8 @@ require (
 
 type Watcher struct {
     debounceMs, maxWaitMs int
--   ignorePatterns        []string
-+   matcher               *GitignoreMatcher
++   matcher               *GitignoreMatcher  // 替换 ignorePatterns
+-   ignorePatterns        []string           // 删除
     onChange              func([]string)
     watcher               *fsnotify.Watcher
     rootPath              string
@@ -809,8 +800,8 @@ type Watcher struct {
     sem               chan struct{}
 }
 
--func NewWatcher(root string, ignore []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
-+func NewWatcher(root string, globalPatterns []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
++// 签名直接修改，不保留旧接口
+func NewWatcher(root string, globalPatterns []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
     fsw, err := fsnotify.NewWatcher()
     if err != nil {
         return nil, err
@@ -822,17 +813,17 @@ type Watcher struct {
 +       fsw.Close()
 +       return nil, err
 +   }
-+   
+    
     w := &Watcher{
-        rootPath:       root,
+        rootPath:   root,
++       matcher:    matcher,
 -       ignorePatterns: ignore,
-+       matcher:        matcher,
-        debounceMs:     debounceMs,
-        maxWaitMs:      maxWaitMs,
-        onChange:       onChange,
-        watcher:        fsw,
-        pending:        make(map[string]struct{}),
-        sem:            make(chan struct{}, 1),
+        debounceMs: debounceMs,
+        maxWaitMs:  maxWaitMs,
+        onChange:   onChange,
+        watcher:    fsw,
+        pending:    make(map[string]struct{}),
+        sem:        make(chan struct{}, 1),
     }
     if err := w.watchAll(root); err != nil {
         fsw.Close()
@@ -841,7 +832,9 @@ type Watcher struct {
     return w, nil
 }
 
++// 完全重写，删除旧的字符串匹配逻辑
 func (w *Watcher) ignored(path string) bool {
++   return w.matcher.Match(path)
 -   rel, _ := filepath.Rel(w.rootPath, path)
 -   base := filepath.Base(path)
 -   for _, p := range w.ignorePatterns {
@@ -853,7 +846,6 @@ func (w *Watcher) ignored(path string) bool {
 -       }
 -   }
 -   return false
-+   return w.matcher.Match(path)
 }
 
 func (w *Watcher) Run() error {
@@ -887,19 +879,19 @@ func (w *Watcher) Run() error {
 ```diff
 // cmd/config.go
 
--// LoadGitignore parses a .gitignore file and returns the patterns.
+-// 删除以下函数，由 GitignoreMatcher 完全替代
+-
 -func LoadGitignore(workDir string) ([]string, error) {
--    // ... 删除
+-    gitignorePath := filepath.Join(workDir, ".gitignore")
+-    // ... 删除所有实现
 -}
 -
--// MergeGitignore loads .gitignore from workDir and merges patterns into config.
 -func (c *Config) MergeGitignore(workDir string) error {
--    // ... 删除
+-    // ... 删除所有实现
 -}
 -
--// normalizeGitignorePattern converts gitignore pattern to our ignore pattern format
 -func normalizeGitignorePattern(pattern string) string {
--    // ... 删除（库会处理）
+-    // ... 删除所有实现
 -}
 ```
 
@@ -917,12 +909,12 @@ func loadConfig(workDir string) (*Config, error) {
     internal.LogDebug("Config loaded: logLevel=%s, debounce=%dms, maxWait=%dms",
         cfg.LogLevel, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs)
 
--   // Merge .gitignore patterns if found
+-   // 删除旧的 gitignore 合并逻辑
 -   if err := cfg.MergeGitignore(workDir); err != nil {
 -       internal.LogError("Failed to load .gitignore: %v", err)
 -   }
 -   internal.LogDebug("Total ignore patterns: %d", len(cfg.Watch.IgnorePatterns))
-+   // .gitignore 文件由 GitignoreMatcher 处理
++   // .gitignore 由 GitignoreMatcher 在 Watcher 初始化时自动处理
 +   internal.LogDebug("Global ignore patterns: %d", len(cfg.Watch.IgnorePatterns))
 
     return cfg, nil
@@ -955,22 +947,37 @@ func loadConfig(workDir string) (*Config, error) {
 | 测试覆盖 | 需要自己写 | 库自带测试 |
 | Bug 风险 | 高 | 低 |
 
+## Implementation
+
+**📋 Detailed implementation plan: [feature-nested-gitignore-implementation-plan.md](./feature-nested-gitignore-implementation-plan.md)**
+
 ## TODO
 
-- [ ] `go.mod`: 添加 `go-gitignore` 依赖
-- [ ] `analyzer/gitignore.go`: 创建 `GitignoreMatcher` 结构
-- [ ] `analyzer/gitignore.go`: 实现 `NewGitignoreMatcher`
-- [ ] `analyzer/gitignore.go`: 实现 `Match` 方法
-- [ ] `analyzer/gitignore.go`: 实现 `AddGitignore` 和 `RemoveGitignore`
-- [ ] `analyzer/watcher.go`: 替换 `ignorePatterns` 为 `matcher`
-- [ ] `analyzer/watcher.go`: 更新 `NewWatcher` 签名
-- [ ] `analyzer/watcher.go`: 在 `Run()` 中添加 `.gitignore` 变化检测
-- [ ] `cmd/config.go`: 删除 `LoadGitignore`, `MergeGitignore`, `normalizeGitignorePattern`
-- [ ] `cmd/common.go`: 移除 `MergeGitignore` 调用
-- [ ] 测试：基本模式匹配
-- [ ] 测试：否定规则
-- [ ] 测试：路径规则 `/root_only`
-- [ ] 测试：嵌套 `.gitignore` 优先级
-- [ ] 测试：动态 `.gitignore` 更新
-- [ ] 测试：空文件和损坏文件
-- [ ] 更新 README
+**Phase 1: Dependencies & Core**
+- [ ] `go.mod`: Add `go-gitignore` dependency
+- [ ] `analyzer/gitignore.go`: Create `GitignoreMatcher` struct
+- [ ] `analyzer/gitignore.go`: Implement `NewGitignoreMatcher`
+- [ ] `analyzer/gitignore.go`: Implement `Match` method
+- [ ] `analyzer/gitignore.go`: Implement `AddGitignore` and `RemoveGitignore`
+
+**Phase 2: Update Watcher**
+- [ ] `analyzer/watcher.go`: Replace `ignorePatterns` with `matcher`
+- [ ] `analyzer/watcher.go`: Update `NewWatcher` signature
+- [ ] `analyzer/watcher.go`: Add `.gitignore` change detection in `Run()`
+
+**Phase 3: Update Callers**
+- [ ] `cmd/config.go`: Delete `LoadGitignore`, `MergeGitignore`, `normalizeGitignorePattern`
+- [ ] `cmd/common.go`: Remove `MergeGitignore` call
+- [ ] `cmd/scan.go`: Update `NewWatcher` call
+- [ ] `cmd/watch.go`: Update `NewWatcher` call
+
+**Phase 4: Testing**
+- [ ] Test: Basic pattern matching
+- [ ] Test: Negation rules
+- [ ] Test: Root-only patterns `/root_only`
+- [ ] Test: Nested `.gitignore` precedence
+- [ ] Test: Dynamic `.gitignore` updates
+- [ ] Test: Empty and corrupted files
+
+**Phase 5: Documentation**
+- [ ] Update README if needed

@@ -5,7 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
+
 	"sync"
 	"time"
 
@@ -15,7 +15,7 @@ import (
 
 type Watcher struct {
 	debounceMs, maxWaitMs int
-	ignorePatterns        []string
+	matcher               *GitignoreMatcher
 	onChange              func([]string)
 	watcher               *fsnotify.Watcher
 	rootPath              string
@@ -53,20 +53,28 @@ func describePathError(err error) (op, path, reason string) {
 	return op, path, reason
 }
 
-func NewWatcher(root string, ignore []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
+func NewWatcher(root string, globalPatterns []string, debounceMs, maxWaitMs int, onChange func([]string)) (*Watcher, error) {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
+
+	// Create gitignore matcher BEFORE watchAll
+	matcher, err := NewGitignoreMatcher(root, globalPatterns)
+	if err != nil {
+		fsw.Close()
+		return nil, err
+	}
+
 	w := &Watcher{
-		rootPath:       root,
-		ignorePatterns: ignore,
-		debounceMs:     debounceMs,
-		maxWaitMs:      maxWaitMs,
-		onChange:       onChange,
-		watcher:        fsw,
-		pending:        make(map[string]struct{}),
-		sem:            make(chan struct{}, 1),
+		rootPath:   root,
+		matcher:    matcher,
+		debounceMs: debounceMs,
+		maxWaitMs:  maxWaitMs,
+		onChange:   onChange,
+		watcher:    fsw,
+		pending:    make(map[string]struct{}),
+		sem:        make(chan struct{}, 1),
 	}
 	if err := w.watchAll(root); err != nil {
 		fsw.Close()
@@ -85,7 +93,7 @@ func (w *Watcher) watchAll(dir string) error {
 		if !d.IsDir() {
 			return nil
 		}
-		if w.ignored(p) {
+		if w.matcher.Match(p) {
 			return filepath.SkipDir
 		}
 		if err := w.watcher.Add(p); err != nil {
@@ -103,7 +111,7 @@ func (w *Watcher) ScanAll() {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		if w.ignored(p) {
+		if w.matcher.Match(p) {
 			return nil
 		}
 		w.add(p)
@@ -113,19 +121,7 @@ func (w *Watcher) ScanAll() {
 	internal.LogDebug("ScanAll: added %d files to pending", count)
 }
 
-func (w *Watcher) ignored(path string) bool {
-	rel, _ := filepath.Rel(w.rootPath, path)
-	base := filepath.Base(path)
-	for _, p := range w.ignorePatterns {
-		if strings.HasPrefix(p, "*.") && strings.HasSuffix(path, p[1:]) {
-			return true
-		}
-		if strings.Contains(rel, p) || base == p {
-			return true
-		}
-	}
-	return false
-}
+
 
 func (w *Watcher) Run() error {
 	for {
@@ -134,7 +130,21 @@ func (w *Watcher) Run() error {
 			if !ok {
 				return nil
 			}
-			if w.ignored(e.Name) {
+
+			// Handle .gitignore file changes
+			if filepath.Base(e.Name) == ".gitignore" {
+				if e.Op&fsnotify.Write != 0 || e.Op&fsnotify.Create != 0 {
+					internal.LogInfo(".gitignore changed: %s", e.Name)
+					if err := w.matcher.AddGitignore(e.Name); err != nil {
+						internal.LogWarning("Failed to reload .gitignore: %v", err)
+					}
+				} else if e.Op&fsnotify.Remove != 0 {
+					w.matcher.RemoveGitignore(e.Name)
+				}
+				continue
+			}
+
+			if w.matcher.Match(e.Name) {
 				continue
 			}
 			internal.LogDebug("Event: %s %s", e.Op, e.Name)

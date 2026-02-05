@@ -75,11 +75,8 @@ func loadConfigAndSetup(workDir string) (*Config, error) {
 	internal.LogDebug("Config loaded: logLevel=%s, debounce=%dms, maxWait=%dms",
 		cfg.LogLevel, cfg.Watch.DebounceMs, cfg.Watch.MaxWaitMs)
 
-	// Merge .gitignore patterns if found
-	if err := cfg.MergeGitignore(workDir); err != nil {
-		internal.LogError("Failed to load .gitignore: %v", err)
-	}
-	internal.LogDebug("Total ignore patterns: %d", len(cfg.Watch.IgnorePatterns))
+	// .gitignore files are handled by GitignoreMatcher in Watcher initialization
+	internal.LogDebug("Global ignore patterns: %d", len(cfg.Watch.IgnorePatterns))
 
 	return cfg, nil
 }
