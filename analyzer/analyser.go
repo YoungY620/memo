@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -111,6 +112,45 @@ func splitIntoBatches(files []string, threshold int) [][]string {
 	return batches
 }
 
+// mergeBatches merges small batches into larger ones using First Fit Decreasing algorithm.
+// This solves the bin packing problem: minimize number of batches while respecting capacity.
+func mergeBatches(batches [][]string, capacity int) [][]string {
+	if len(batches) <= 1 {
+		return batches
+	}
+
+	// Sort batches by size descending (FFD: First Fit Decreasing)
+	sorted := make([][]string, len(batches))
+	copy(sorted, batches)
+	sort.Slice(sorted, func(i, j int) bool {
+		return len(sorted[i]) > len(sorted[j])
+	})
+
+	var merged [][]string
+
+	for _, batch := range sorted {
+		placed := false
+
+		// Try to fit into existing merged batch (First Fit)
+		for i := range merged {
+			if len(merged[i])+len(batch) <= capacity {
+				merged[i] = append(merged[i], batch...)
+				placed = true
+				break
+			}
+		}
+
+		// No fit found, create new batch
+		if !placed {
+			newBatch := make([]string, len(batch))
+			copy(newBatch, batch)
+			merged = append(merged, newBatch)
+		}
+	}
+
+	return merged
+}
+
 // NewAnalyser creates a new Analyser instance
 func NewAnalyser(agentCfg AgentConfig, workDir string) *Analyser {
 	sessionID := generateSessionID(workDir)
@@ -129,8 +169,9 @@ func (a *Analyser) Analyse(ctx context.Context, changedFiles []string) error {
 	// Convert to relative paths
 	relFiles := toRelativePaths(changedFiles, a.workDir)
 
-	// Split into batches if needed
+	// Split into batches if needed, then merge small batches
 	batches := splitIntoBatches(relFiles, maxFilesPerBatch)
+	batches = mergeBatches(batches, maxFilesPerBatch)
 	internal.LogInfo("Starting analysis for %d files in %d batch(es)", len(changedFiles), len(batches))
 
 	// Mark analysis in progress

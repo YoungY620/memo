@@ -224,6 +224,162 @@ func TestSplitIntoBatches_LargeScale(t *testing.T) {
 	assert.Equal(t, 500, len(fileSet), "All 500 files should be present")
 }
 
+func TestMergeBatches(t *testing.T) {
+	tests := []struct {
+		name           string
+		batches        [][]string
+		capacity       int
+		expectedCount  int
+		maxBatchSize   int
+	}{
+		{
+			name:          "empty batches",
+			batches:       [][]string{},
+			capacity:      100,
+			expectedCount: 0,
+			maxBatchSize:  0,
+		},
+		{
+			name:          "single batch - no merge needed",
+			batches:       [][]string{{"a.go", "b.go"}},
+			capacity:      100,
+			expectedCount: 1,
+			maxBatchSize:  100,
+		},
+		{
+			name: "many small batches - merge into one",
+			batches: [][]string{
+				{"a/1.go", "a/2.go"},
+				{"b/1.go", "b/2.go"},
+				{"c/1.go", "c/2.go"},
+				{"d/1.go", "d/2.go"},
+				{"e/1.go", "e/2.go"},
+			},
+			capacity:      100,
+			expectedCount: 1,
+			maxBatchSize:  100,
+		},
+		{
+			name: "batches exceed capacity - merge into multiple",
+			batches: [][]string{
+				generateFiles("dir1", 30),
+				generateFiles("dir2", 30),
+				generateFiles("dir3", 30),
+				generateFiles("dir4", 30),
+				generateFiles("dir5", 30),
+			},
+			capacity:      100,
+			expectedCount: 2, // 30+30+30=90, 30+30=60
+			maxBatchSize:  100,
+		},
+		{
+			name: "50 tiny batches - merge into one",
+			batches: func() [][]string {
+				var b [][]string
+				for i := 0; i < 50; i++ {
+					b = append(b, []string{fmt.Sprintf("dir%d/file.go", i), fmt.Sprintf("dir%d/file2.go", i)})
+				}
+				return b
+			}(),
+			capacity:      100,
+			expectedCount: 1,
+			maxBatchSize:  100,
+		},
+		{
+			name: "mixed sizes - FFD optimization",
+			batches: [][]string{
+				generateFiles("big1", 60),
+				generateFiles("big2", 60),
+				generateFiles("small1", 20),
+				generateFiles("small2", 20),
+				generateFiles("small3", 20),
+				generateFiles("small4", 20),
+			},
+			capacity:      100,
+			expectedCount: 2, // FFD: 60+20+20=100, 60+20+20=100
+			maxBatchSize:  100,
+		},
+		{
+			name: "batch at capacity - no merge possible",
+			batches: [][]string{
+				generateFiles("dir1", 100),
+				generateFiles("dir2", 100),
+			},
+			capacity:      100,
+			expectedCount: 2,
+			maxBatchSize:  100,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			merged := analyzer.MergeBatches(tt.batches, tt.capacity)
+
+			// Verify batch count
+			assert.Equal(t, tt.expectedCount, len(merged), "Should have expected number of batches")
+
+			// Verify no batch exceeds capacity
+			for i, batch := range merged {
+				assert.LessOrEqual(t, len(batch), tt.maxBatchSize, "Batch %d should not exceed capacity", i)
+			}
+
+			// Verify all files are preserved
+			originalFiles := make(map[string]bool)
+			for _, batch := range tt.batches {
+				for _, f := range batch {
+					originalFiles[f] = true
+				}
+			}
+
+			mergedFiles := make(map[string]bool)
+			for _, batch := range merged {
+				for _, f := range batch {
+					assert.False(t, mergedFiles[f], "File should not be duplicated: %s", f)
+					mergedFiles[f] = true
+				}
+			}
+
+			assert.Equal(t, len(originalFiles), len(mergedFiles), "All files should be preserved")
+		})
+	}
+}
+
+func TestSplitAndMerge_Integration(t *testing.T) {
+	// Test the full pipeline: split then merge
+	// 50 directories with 3 files each = 150 files total (exceeds threshold of 100)
+	var files []string
+	for i := 0; i < 50; i++ {
+		files = append(files, fmt.Sprintf("dir%d/a.go", i), fmt.Sprintf("dir%d/b.go", i), fmt.Sprintf("dir%d/c.go", i))
+	}
+
+	// Split will create 50 small batches (each dir has 3 files < threshold)
+	batches := analyzer.SplitIntoBatches(files, 100)
+	assert.Equal(t, 50, len(batches), "Split should create 50 batches")
+
+	// Merge should combine them into 2 batches (150 files, capacity 100)
+	merged := analyzer.MergeBatches(batches, 100)
+	assert.Equal(t, 2, len(merged), "Merge should combine into 2 batches")
+
+	// Verify all 150 files preserved
+	totalFiles := 0
+	for _, batch := range merged {
+		totalFiles += len(batch)
+	}
+	assert.Equal(t, 150, totalFiles, "All 150 files should be preserved")
+}
+
+func BenchmarkMergeBatches(b *testing.B) {
+	// Create 100 small batches of 5 files each
+	var batches [][]string
+	for i := 0; i < 100; i++ {
+		batches = append(batches, generateFiles(fmt.Sprintf("dir%d", i), 5))
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		analyzer.MergeBatches(batches, 100)
+	}
+}
+
 func TestLoadPrompt(t *testing.T) {
 	tests := []struct {
 		name    string

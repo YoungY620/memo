@@ -11,6 +11,7 @@ var (
 	GenerateSessionID = generateSessionID
 	ToRelativePaths   = toRelativePaths
 	SplitIntoBatches  = splitIntoBatches
+	MergeBatches      = mergeBatches
 	LoadPrompt        = loadPrompt
 
 	// Banner exports
