@@ -19,6 +19,8 @@ Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instanc
 
 [performance_analysis_final.png](performance_analysis_final.png)
 
+![overall pass rate](overall-passrate-improvement.png)
+
 **Key findings:**
 - **4× pass rate improvement** (4.3% → 17.4%)
 - **15% faster inference** (212s → 180s per instance)
