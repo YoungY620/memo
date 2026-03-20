@@ -15,7 +15,7 @@ Inspired by traditional code indexing, Memo maintains a semantic index specifica
 
 ## Benchmark
 
-Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instances, limited by time):
+Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instances, limited by time&token):
 
 [performance_analysis_final.png](performance_analysis_final.png)
 
