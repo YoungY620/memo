@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "8b2f125617ba",
+  "session_id": "008bcd8e-bdc3-4004-a591-74eb0acbba38",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-20T07:49:44.542081Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "cmd/mcp.go",
+    "mcp/export_testing.go",
+    "mcp/server.go",
+    "run-mcp.ps1",
+    "run-mcp.sh",
+    "tests/integration/main_test.go",
+    "tests/mcp/server_test.go"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "4314ed62006a",
+  "token_usage": {
+    "input_tokens": 47,
+    "cache_creation_tokens": 126853,
+    "cache_read_tokens": 2234912,
+    "output_tokens": 10942,
+    "api_call_count": 43
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-20T07:49:44.345048Z",
+    "agent_lines": 325,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 325,
+    "agent_percentage": 100
+  },
+  "transcript_path": ".claude/projects/-Users-moonshot-dev-working-kimi-sdk-agent-indexer/008bcd8e-bdc3-4004-a591-74eb0acbba38.jsonl"
+}
