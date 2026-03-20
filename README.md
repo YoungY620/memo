@@ -140,6 +140,37 @@ Memo exposes `.memo/index` to AI agents via MCP protocol:
    > Summarize this repo
    ```
 
+## Entire.io Integration (Optional)
+
+Memo can analyze [Entire.io](https://entire.io) checkpoint data to capture AI coding session history. When Entire.io is detected in a repository, Memo automatically reads checkpoint transcripts and fuses the insights into the existing 4 index files:
+
+- **stories.json** — Each AI session becomes a story (tagged `"ai-session"`)
+- **arch.json** — Structural changes revealed during sessions
+- **interface.json** — New or modified interfaces
+- **issues.json** — Design decisions, TODOs, and bugs discovered
+
+### Setup
+
+1. Install [Entire CLI](https://github.com/entireio/cli):
+   ```bash
+   # macOS
+   brew install entireio/tap/entire
+   # or via go install
+   go install github.com/entireio/cli/cmd/entire@latest
+   ```
+
+2. Initialize Entire in your repo:
+   ```bash
+   entire init
+   ```
+
+3. Run Memo as usual — it will detect `.entire/settings.json` and the `entire/checkpoints/v1` branch automatically:
+   ```bash
+   memo watch   # or: memo scan
+   ```
+
+Entire.io provides a normalized observation layer across multiple AI coding agents (Claude Code, Gemini CLI, OpenCode, etc.), so Memo can index session history regardless of which agent was used.
+
 ## Output
 
 ```
