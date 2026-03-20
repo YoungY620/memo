@@ -31,3 +31,9 @@ kimi-cli/
 # .memo
 testdata/
 .memo/watcher.lock
+
+# Entire.io runtime files
+.entire/settings.local.json
+.entire/logs/
+.entire/metadata/
+.entire/current_session
