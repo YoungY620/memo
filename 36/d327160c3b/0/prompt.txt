@@ -1,0 +1,181 @@
+Implement the following plan:
+
+# Plan: Robust MCP Server Startup
+
+## Context
+
+Currently, the MCP config requires `memo` to be pre-installed and in PATH:
+```json
+{ "mcpServers": { "memo": { "command": "memo", "args": ["mcp"] } } }
+```
+Problems:
+1. If memo isn't installed, MCP server fails silently — agent loses all memo tools
+2. `memo mcp` hard-exits if `.memo/index` doesn't exist (kills the MCP server process)
+3. Corrupted index files produce unhelpful error messages
+
+Goal: `eval "$(curl ...)"` style bootstrap + resilient server that never crashes the agent.
+
+---
+
+## Changes
+
+### 1. Create `run-mcp.sh` (new file, repo root)
+
+Auto-install launcher script. Key design:
+- Uses `eval "$(curl ...)"` pattern in MCP config (does NOT consume stdin, unlike `curl | sh`)
+- All install output goes to stderr (stdout reserved for MCP JSON-RPC)
+- `exec memo mcp "$@"` at the end to replace shell process, preserving stdio
+- Inlines install logic (can't delegate to `install.sh` via pipe — that would consume stdin)
+
+```json
+{
+  "mcpServers": {
+    "memo": {
+      "command": "sh",
+      "args": ["-c", "eval \"$(curl -fsSL https://raw.githubusercontent.com/YoungY620/memo/main/run-mcp.sh)\""]
+    }
+  }
+}
+```
+
+Fallback behavior:
+- If memo is already installed → curl downloads tiny script, memo runs immediately
+- If GitHub is down but memo is installed → curl fails silently, launcher finds local binary and starts normally
+- If GitHub is down and memo is NOT installed → exit 1 with clear error message
+- MCP config uses `eval "$(curl -fsSL ... 2>/dev/null || echo '')"` — curl failure yields empty string, eval is a no-op, script falls through to find local binary
+
+### 2. Create `run-mcp.ps1` (new file, repo root)
+
+Windows equivalent. PowerShell's `Invoke-WebRequest` doesn't consume stdin, so the pattern is simpler.
+
+### 3. Modify `cmd/mcp.go` — Remove hard pre-check
+
+**Remove lines 29-33** (the `os.Stat` + `fmt.Errorf` that kills the server when index is missing).
+
+Before:
+```go
+func runMcp(cmd *cobra.Command, args []string) error {
+    workDir, err := resolveWorkDir()
+    if err != nil { return err }
+    indexDir := filepath.Join(workDir, ".memo", "index")
+    if _, err := os.Stat(indexDir); os.IsNotExist(err) {
+        return fmt.Errorf("index directory not found...")  // <-- KILLS SERVER
+    }
+    return mcp.Serve(workDir)
+}
+```
+
+After:
+```go
+func runMcp(cmd *cobra.Command, args []string) error {
+    workDir, err := resolveWorkDir()
+    if err != nil { return err }
+    return mcp.Serve(workDir)
+}
+```
+
+### 4. Modify `mcp/server.go` — Resilient tool calls + index status tool
+
+**4a. Add `indexExists()` helper:**
+```go
+func (s *Server) indexExists() bool {
+    _, err := os.Stat(s.indexDir)
+    return err == nil
+}
+```
+
+**4b. Modify `handleToolCall()` — check index before querying:**
+- If index directory doesn't exist, return `ToolCallResult{IsError: true}` with message: "Index not found. Run 'memo scan' or 'memo watch' first."
+- If `loadFile` fails (corrupted JSON), enhance error with recovery hint
+
+No new tools — keep only `memo_list_keys` and `memo_get_value`. Error messages are improved to guide the agent.
+
+### 5. Update tests
+
+**`tests/integration/main_test.go`** — `TestMCPMode_NoIndex` (line 73):
+- Currently asserts `memo mcp` exits with error. Must change to: server starts, tool call returns `isError: true` with helpful message.
+
+**`tests/mcp/server_test.go`** — Add:
+- `TestServer_HandleToolCall_NoIndex` — tool calls return helpful error when index is missing
+
+### 6. Update `README.md`
+
+Replace MCP Integration section (lines 113-137) with:
+- **Quick Setup (auto-install)** — `eval "$(curl ...)"` config for Linux/macOS and PowerShell for Windows
+- **Already installed** — simple `"command": "memo"` config
+- Updated workflow noting agents get helpful errors if index isn't built yet
+
+---
+
+## Files to modify
+
+| File | Action |
+|------|--------|
+| `run-mcp.sh` | CREATE — Unix launcher with auto-install |
+| `run-mcp.ps1` | CREATE — Windows launcher with auto-install |
+| `cmd/mcp.go` | MODIFY — Remove hard index pre-check (delete lines 29-33, remove `os` and `path/filepath` imports if unused) |
+| `mcp/server.go` | MODIFY — Add `indexExists()`, enhanced error messages in `handleToolCall()` |
+| `tests/integration/main_test.go` | MODIFY — Update `TestMCPMode_NoIndex` |
+| `tests/mcp/server_test.go` | MODIFY — Add no-index test |
+| `README.md` | MODIFY — Update MCP Integration section |
+
+---
+
+## Verification
+
+1. `make test` — all existing tests pass (after updates)
+2. `make test-mcp` — MCP-specific tests pass
+3. Manual test: run `memo mcp -p /tmp/empty` (no index) — server starts, tool call returns helpful error
+4. Manual test: `eval "$(cat run-mcp.sh)"` with memo in PATH — starts MCP server normally
+5. Integration test: `TestMCPMode_NoIndex` verifies server starts without index
+6. Integration test: tool calls without index return `isError: true` with "memo scan" suggestion
+
+## Implementation order
+
+1. `cmd/mcp.go` — smallest change, highest impact
+2. `mcp/server.go` — resilient tool calls + status tool
+3. Tests — update existing + add new
+4. `run-mcp.sh` + `run-mcp.ps1` — launcher scripts
+5. `README.md` — documentation
+
+
+If you need specific details from before exiting plan mode (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/moonshot/.REDACTED.jsonl
+
+---
+
+add commit push
+
+---
+
+23 [INFO] Processing checkpoint batch 1/8 (6 checkpoints)
+2026/03/20 14:07:29 [ERROR] Checkpoint analysis failed: checkpoint batch 1/8 failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13002229 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 14:25:13 [INFO] Triggered with 2 changed files
+2026/03/20 14:25:13 [INFO] Starting analysis for 2 files in 1 batch(es)
+2026/03/20 14:25:13 [INFO] Processing batch 1/1 (2 files)
+2026/03/20 14:25:21 [ERROR] Batch 1/1: initial prompt failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13012711 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 14:25:21 [ERROR] Analysis failed: batch 1/1 failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13012711 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 14:28:38 [INFO] Triggered with 2 changed files
+2026/03/20 14:28:38 [INFO] Starting analysis for 2 files in 1 batch(es)
+2026/03/20 14:28:38 [INFO] Processing batch 1/1 (2 files)
+2026/03/20 14:28:43 [ERROR] Batch 1/1: initial prompt failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13023225 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 14:28:43 [ERROR] Analysis failed: batch 1/1 failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13023225 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 15:03:36 [INFO] Triggered with 1 changed files
+2026/03/20 15:03:36 [INFO] Starting analysis for 1 files in 1 batch(es)
+2026/03/20 15:03:36 [INFO] Processing batch 1/1 (1 files)
+2026/03/20 15:03:43 [ERROR] Batch 1/1: initial prompt failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13033701 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 15:03:43 [ERROR] Analysis failed: batch 1/1 failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13033701 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 15:09:27 [INFO] Triggered with 1 changed files
+2026/03/20 15:09:27 [INFO] Starting analysis for 1 files in 1 batch(es)
+2026/03/20 15:09:27 [INFO] Processing batch 1/1 (1 files)
+2026/03/20 15:09:32 [ERROR] Batch 1/1: initial prompt failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13044150 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 15:09:32 [ERROR] Analysis failed: batch 1/1 failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13044150 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 15:10:38 [INFO] Triggered with 2 changed files
+2026/03/20 15:10:38 [INFO] Starting analysis for 2 files in 1 batch(es)
+2026/03/20 15:10:38 [INFO] Processing batch 1/1 (2 files)
+2026/03/20 15:10:48 [ERROR] Batch 1/1: initial prompt failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13054662 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 15:10:48 [ERROR] Analysis failed: batch 1/1 failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13054662 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 15:15:34 [INFO] Triggered with 23 changed files
+2026/03/20 15:15:34 [INFO] Starting analysis for 23 files in 1 batch(es)
+2026/03/20 15:15:34 [INFO] Processing batch 1/1 (23 files)
+2026/03/20 15:15:39 [ERROR] Batch 1/1: initial prompt failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13065927 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
+2026/03/20 15:15:39 [ERROR] Analysis failed: batch 1/1 failed: turn error: {"code":-32003,"message":"Error code: 400 - {'error': {'message': 'Invalid request: total message size 13065927 exceeds limit 4194304', 'type': 'invalid_request_error'}}","data":null}
