@@ -305,55 +305,35 @@ func truncateContent(content string, maxLen int) string {
 	return content[:cut] + "\n\n... [truncated, showing first " + fmt.Sprintf("%dKB", cut/1024) + " of " + fmt.Sprintf("%dKB", len(content)/1024) + "]"
 }
 
-// checkpointFilePriority returns sort priority for checkpoint files.
-// Lower = more important (included first when budget is tight).
-func checkpointFilePriority(path string) int {
+// skipCheckpointFile returns true for files that should be excluded from
+// the analysis prompt. full.jsonl is redundant (context.md summarizes it)
+// and content_hash.txt has no analytical value.
+func skipCheckpointFile(path string) bool {
 	base := filepath.Base(path)
-	switch {
-	case base == "metadata.json":
-		return 0
-	case base == "prompt.txt":
-		return 1
-	case base == "context.md":
-		return 2
-	case base == "full.jsonl":
-		return 3
-	default:
-		return 4
-	}
+	return base == "full.jsonl" || base == "content_hash.txt"
 }
 
 // formatCheckpointData formats a single checkpoint's data for the prompt,
-// truncating large files and capping total size per checkpoint.
+// skipping redundant files and truncating large ones.
 func formatCheckpointData(cp CheckpointData, index int) string {
 	var b strings.Builder
-	header := fmt.Sprintf("### Checkpoint %d: %s (commit: %s)\n\n", index, cp.CheckpointID, cp.CommitSHA[:8])
-	b.WriteString(header)
-
-	// Sort files by priority
-	paths := make([]string, 0, len(cp.Files))
-	for p := range cp.Files {
-		paths = append(paths, p)
-	}
-	sort.Slice(paths, func(i, j int) bool {
-		return checkpointFilePriority(paths[i]) < checkpointFilePriority(paths[j])
-	})
+	b.WriteString(fmt.Sprintf("### Checkpoint %d: %s (commit: %s)\n\n", index, cp.CheckpointID, cp.CommitSHA[:8]))
 
 	remaining := maxCheckpointSize
-	for _, path := range paths {
+	for path, content := range cp.Files {
+		if skipCheckpointFile(path) {
+			continue
+		}
 		if remaining <= 0 {
-			b.WriteString(fmt.Sprintf("... [remaining files omitted, checkpoint budget exhausted]\n\n"))
+			b.WriteString("... [remaining files omitted, checkpoint budget exhausted]\n\n")
 			break
 		}
-		content := cp.Files[path]
-		// Per-file truncation
 		fileLimit := maxCheckpointFileSize
 		if remaining < fileLimit {
 			fileLimit = remaining
 		}
 		content = truncateContent(content, fileLimit)
-		entry := fmt.Sprintf("**File: %s**\n```\n%s\n```\n\n", path, content)
-		b.WriteString(entry)
+		b.WriteString(fmt.Sprintf("**File: %s**\n```\n%s\n```\n\n", path, content))
 		remaining -= len(content)
 	}
 	return b.String()
