@@ -282,11 +282,14 @@ func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, t
 
 // maxCheckpointFileSize is the per-file truncation limit for checkpoint content.
 // Large files (especially full.jsonl transcripts) are truncated to this size.
-const maxCheckpointFileSize = 200 * 1024 // 200KB
+const maxCheckpointFileSize = 100 * 1024 // 100KB
+
+// maxCheckpointSize is the total content budget per checkpoint (all files combined).
+const maxCheckpointSize = 300 * 1024 // 300KB
 
 // maxCheckpointBatchSize is the target maximum total content size per batch.
 // Leaves room for prompt templates and API overhead within the 4MB API limit.
-const maxCheckpointBatchSize = 3 * 1024 * 1024 // 3MB
+const maxCheckpointBatchSize = 2 * 1024 * 1024 // 2MB
 
 // truncateContent truncates content to maxLen bytes at a line boundary,
 // appending a truncation notice.
@@ -302,14 +305,56 @@ func truncateContent(content string, maxLen int) string {
 	return content[:cut] + "\n\n... [truncated, showing first " + fmt.Sprintf("%dKB", cut/1024) + " of " + fmt.Sprintf("%dKB", len(content)/1024) + "]"
 }
 
+// checkpointFilePriority returns sort priority for checkpoint files.
+// Lower = more important (included first when budget is tight).
+func checkpointFilePriority(path string) int {
+	base := filepath.Base(path)
+	switch {
+	case base == "metadata.json":
+		return 0
+	case base == "prompt.txt":
+		return 1
+	case base == "context.md":
+		return 2
+	case base == "full.jsonl":
+		return 3
+	default:
+		return 4
+	}
+}
+
 // formatCheckpointData formats a single checkpoint's data for the prompt,
-// truncating large files. Returns the formatted string.
+// truncating large files and capping total size per checkpoint.
 func formatCheckpointData(cp CheckpointData, index int) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("### Checkpoint %d: %s (commit: %s)\n\n", index, cp.CheckpointID, cp.CommitSHA[:8]))
-	for path, content := range cp.Files {
-		content = truncateContent(content, maxCheckpointFileSize)
-		b.WriteString(fmt.Sprintf("**File: %s**\n```\n%s\n```\n\n", path, content))
+	header := fmt.Sprintf("### Checkpoint %d: %s (commit: %s)\n\n", index, cp.CheckpointID, cp.CommitSHA[:8])
+	b.WriteString(header)
+
+	// Sort files by priority
+	paths := make([]string, 0, len(cp.Files))
+	for p := range cp.Files {
+		paths = append(paths, p)
+	}
+	sort.Slice(paths, func(i, j int) bool {
+		return checkpointFilePriority(paths[i]) < checkpointFilePriority(paths[j])
+	})
+
+	remaining := maxCheckpointSize
+	for _, path := range paths {
+		if remaining <= 0 {
+			b.WriteString(fmt.Sprintf("... [remaining files omitted, checkpoint budget exhausted]\n\n"))
+			break
+		}
+		content := cp.Files[path]
+		// Per-file truncation
+		fileLimit := maxCheckpointFileSize
+		if remaining < fileLimit {
+			fileLimit = remaining
+		}
+		content = truncateContent(content, fileLimit)
+		entry := fmt.Sprintf("**File: %s**\n```\n%s\n```\n\n", path, content)
+		b.WriteString(entry)
+		remaining -= len(content)
 	}
 	return b.String()
 }
@@ -398,6 +443,7 @@ func (a *Analyser) analyseCheckpointBatch(ctx context.Context, checkpoints []Che
 	}
 
 	initialPrompt := contextPrompt + "\n\n" + analysePrompt + batchInfo + checkpointInfo.String()
+	internal.LogDebug("Checkpoint batch %d/%d: prompt size=%dKB", batchNum, totalBatches, len(initialPrompt)/1024)
 
 	// Create agent session
 	mcpFile := filepath.Join(a.workDir, ".memo", "mcp.json")
