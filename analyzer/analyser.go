@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -51,12 +52,22 @@ type Analyser struct {
 	sessionID string
 }
 
-// generateSessionID creates a deterministic session ID based on work directory
+// generateSessionID creates a deterministic session ID based on work directory.
 // Format: <sessionPrefix><8-char-hash-of-workdir>
+// Used as a stable prefix; each analysis batch appends a unique suffix
+// to avoid accumulating conversation history across runs.
 func generateSessionID(workDir string) string {
 	hash := sha256.Sum256([]byte(workDir))
 	shortHash := hex.EncodeToString(hash[:4]) // 8 hex chars
 	return sessionPrefix + shortHash
+}
+
+// newBatchSessionID returns a unique session ID for a single analysis batch.
+// This ensures each batch starts with a fresh conversation (no accumulated
+// history from prior runs) while the feedback loop within a batch shares context.
+func (a *Analyser) newBatchSessionID() string {
+	suffix := fmt.Sprintf("-%d-%04x", time.Now().UnixMilli(), rand.Intn(0xFFFF))
+	return a.sessionID + suffix
 }
 
 // toRelativePaths converts absolute paths to relative paths based on workDir
@@ -205,6 +216,10 @@ func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, t
 	// (which may contain memo itself, causing infinite recursion)
 	mcpFile := filepath.Join(a.workDir, ".memo", "mcp.json")
 
+	// Fresh session per batch to prevent conversation history accumulation
+	batchSessionID := a.newBatchSessionID()
+	internal.LogDebug("Batch %d/%d using session: %s", batchNum, totalBatches, batchSessionID)
+
 	// Use kimi defaults if agent config is not set
 	if a.agentCfg.APIKey != "" && a.agentCfg.Model != "" {
 		internal.LogDebug("Using configured model: %s", a.agentCfg.Model)
@@ -214,7 +229,7 @@ func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, t
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
 			agent.WithMCPConfigFile(mcpFile),
-			agent.WithSession(a.sessionID),
+			agent.WithSession(batchSessionID),
 		)
 	} else {
 		internal.LogDebug("Using kimi default configuration")
@@ -222,7 +237,7 @@ func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, t
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
 			agent.WithMCPConfigFile(mcpFile),
-			agent.WithSession(a.sessionID),
+			agent.WithSession(batchSessionID),
 		)
 	}
 	if err != nil {
@@ -425,8 +440,10 @@ func (a *Analyser) analyseCheckpointBatch(ctx context.Context, checkpoints []Che
 	initialPrompt := contextPrompt + "\n\n" + analysePrompt + batchInfo + checkpointInfo.String()
 	internal.LogDebug("Checkpoint batch %d/%d: prompt size=%dKB", batchNum, totalBatches, len(initialPrompt)/1024)
 
-	// Create agent session
+	// Create agent session — fresh per batch to avoid history accumulation
 	mcpFile := filepath.Join(a.workDir, ".memo", "mcp.json")
+	batchSessionID := a.newBatchSessionID()
+	internal.LogDebug("Checkpoint batch %d/%d using session: %s", batchNum, totalBatches, batchSessionID)
 
 	var session *agent.Session
 	var err error
@@ -438,14 +455,14 @@ func (a *Analyser) analyseCheckpointBatch(ctx context.Context, checkpoints []Che
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
 			agent.WithMCPConfigFile(mcpFile),
-			agent.WithSession(a.sessionID),
+			agent.WithSession(batchSessionID),
 		)
 	} else {
 		session, err = agent.NewSession(
 			agent.WithWorkDir(a.workDir),
 			agent.WithAutoApprove(),
 			agent.WithMCPConfigFile(mcpFile),
-			agent.WithSession(a.sessionID),
+			agent.WithSession(batchSessionID),
 		)
 	}
 	if err != nil {
