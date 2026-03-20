@@ -349,7 +349,8 @@ func TestSplitAndMerge_Integration(t *testing.T) {
 	// 50 directories with 3 files each = 150 files total (exceeds threshold of 100)
 	var files []string
 	for i := 0; i < 50; i++ {
-		files = append(files, fmt.Sprintf("dir%d/a.go", i), fmt.Sprintf("dir%d/b.go", i), fmt.Sprintf("dir%d/c.go", i))
+		dir := fmt.Sprintf("dir%d", i)
+		files = append(files, filepath.Join(dir, "a.go"), filepath.Join(dir, "b.go"), filepath.Join(dir, "c.go"))
 	}
 
 	// Split will create 50 small batches (each dir has 3 files < threshold)
