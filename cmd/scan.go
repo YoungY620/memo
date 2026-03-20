@@ -112,6 +112,29 @@ func runScan(cmd *cobra.Command, args []string) error {
 
 	// Flush and exit
 	watcher.Flush()
+
+	// Entire.io checkpoint scanning
+	entireCfg, _ := analyzer.DetectEntire(workDir)
+	if entireCfg != nil && entireCfg.Enabled {
+		internal.LogInfo("Entire.io detected (strategy=%s), scanning checkpoints", entireCfg.Strategy)
+
+		cpMon, err := analyzer.NewCheckpointMonitor(workDir, cfg.Watch.DebounceMs, nil)
+		if err != nil {
+			internal.LogError("Failed to create checkpoint monitor: %v", err)
+		} else {
+			cps, err := cpMon.ScanAll()
+			if err != nil {
+				internal.LogError("Checkpoint scan failed: %v", err)
+			} else if len(cps) > 0 {
+				ctx := context.Background()
+				if err := ana.AnalyseCheckpoints(ctx, cps); err != nil {
+					internal.LogError("Checkpoint analysis failed: %v", err)
+				}
+			}
+			cpMon.Close()
+		}
+	}
+
 	internal.LogInfo("Scan mode completed")
 	return nil
 }

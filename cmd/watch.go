@@ -118,6 +118,42 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		UpdateInfo: updateInfo,
 	})
 
+	// Entire.io checkpoint monitoring
+	entireCfg, _ := analyzer.DetectEntire(workDir)
+	if entireCfg != nil && entireCfg.Enabled {
+		internal.LogInfo("Entire.io detected (strategy=%s)", entireCfg.Strategy)
+
+		cpMon, err := analyzer.NewCheckpointMonitor(workDir, cfg.Watch.DebounceMs, func(cps []analyzer.CheckpointData) {
+			ctx := context.Background()
+			if err := ana.AnalyseCheckpoints(ctx, cps); err != nil {
+				internal.LogError("Checkpoint analysis failed: %v", err)
+			}
+		})
+		if err != nil {
+			internal.LogError("Failed to create checkpoint monitor: %v", err)
+		} else {
+			defer cpMon.Close()
+
+			if !skipScan {
+				cps, err := cpMon.ScanAll()
+				if err != nil {
+					internal.LogError("Checkpoint scan failed: %v", err)
+				} else if len(cps) > 0 {
+					ctx := context.Background()
+					if err := ana.AnalyseCheckpoints(ctx, cps); err != nil {
+						internal.LogError("Checkpoint analysis failed: %v", err)
+					}
+				}
+			}
+
+			go func() {
+				if err := cpMon.Run(); err != nil {
+					internal.LogError("Checkpoint monitor error: %v", err)
+				}
+			}()
+		}
+	}
+
 	// Initial scan (unless --skip-scan is set)
 	internal.LogInfo("Watcher started, workDir=%s", workDir)
 	if !skipScan {

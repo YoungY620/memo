@@ -49,6 +49,7 @@ func initIndex(indexDir string) error {
 watcher.lock
 status.json
 .history
+entire_state.json
 `
 		internal.LogDebug("Creating %s", gitignoreFile)
 		if err := os.WriteFile(gitignoreFile, []byte(gitignoreContent), 0644); err != nil {

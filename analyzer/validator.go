@@ -184,3 +184,4 @@ func FormatValidationErrors(result ValidationResult) string {
 	}
 	return strings.Join(result.Errors, "\n")
 }
+

@@ -280,6 +280,101 @@ func (a *Analyser) analyseBatch(ctx context.Context, files []string, batchNum, t
 	return fmt.Errorf("validation failed after %d attempts", maxRetries)
 }
 
+// AnalyseCheckpoints analyses Entire.io checkpoint data and fuses insights
+// into the existing 4 index files (arch, interface, stories, issues).
+func (a *Analyser) AnalyseCheckpoints(ctx context.Context, checkpoints []CheckpointData) error {
+	if len(checkpoints) == 0 {
+		return nil
+	}
+
+	internal.LogInfo("Analyzing %d checkpoint(s) into index files", len(checkpoints))
+
+	// Mark status
+	memoDir := filepath.Dir(a.indexDir)
+	if err := SetStatus(memoDir, "analyzing"); err != nil {
+		internal.LogError("Failed to set status: %v", err)
+	}
+	defer func() {
+		if err := SetStatus(memoDir, "idle"); err != nil {
+			internal.LogError("Failed to clear status: %v", err)
+		}
+	}()
+
+	// Build prompt with checkpoint data
+	contextPrompt := loadPrompt("context")
+	analysePrompt := loadPrompt("analyse_checkpoints")
+
+	var checkpointInfo strings.Builder
+	checkpointInfo.WriteString("\n\n## Checkpoint Data\n\n")
+	for i, cp := range checkpoints {
+		checkpointInfo.WriteString(fmt.Sprintf("### Checkpoint %d: %s (commit: %s)\n\n", i+1, cp.CheckpointID, cp.CommitSHA[:8]))
+		for path, content := range cp.Files {
+			checkpointInfo.WriteString(fmt.Sprintf("**File: %s**\n```\n%s\n```\n\n", path, content))
+		}
+	}
+
+	initialPrompt := contextPrompt + "\n\n" + analysePrompt + checkpointInfo.String()
+
+	// Create agent session
+	mcpFile := filepath.Join(a.workDir, ".memo", "mcp.json")
+
+	var session *agent.Session
+	var err error
+
+	if a.agentCfg.APIKey != "" && a.agentCfg.Model != "" {
+		session, err = agent.NewSession(
+			agent.WithAPIKey(a.agentCfg.APIKey),
+			agent.WithModel(a.agentCfg.Model),
+			agent.WithWorkDir(a.workDir),
+			agent.WithAutoApprove(),
+			agent.WithMCPConfigFile(mcpFile),
+			agent.WithSession(a.sessionID),
+		)
+	} else {
+		session, err = agent.NewSession(
+			agent.WithWorkDir(a.workDir),
+			agent.WithAutoApprove(),
+			agent.WithMCPConfigFile(mcpFile),
+			agent.WithSession(a.sessionID),
+		)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to create session: %w", err)
+	}
+	defer session.Close()
+
+	// Send prompt
+	internal.LogDebug("Sending checkpoint analysis prompt for %d checkpoints", len(checkpoints))
+	start := time.Now()
+	if err := a.runPrompt(ctx, session, initialPrompt); err != nil {
+		return fmt.Errorf("checkpoint analysis failed: %w", err)
+	}
+	internal.LogDebug("Checkpoint analysis completed, duration=%s", time.Since(start))
+
+	// Validation loop (reuse existing ValidateIndex for the 4 files)
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		result := ValidateIndex(a.indexDir)
+		if result.Valid {
+			internal.LogInfo("Checkpoint analysis validation passed")
+			return nil
+		}
+
+		errMsg := FormatValidationErrors(result)
+		internal.LogError("Checkpoint validation failed (attempt %d/%d): %s", i+1, maxRetries, errMsg)
+
+		feedbackPrompt := loadPrompt("feedback")
+		errorInfo := "Validation errors:\n" + errMsg
+		fullFeedback := loadPrompt("context") + "\n\n" + feedbackPrompt + "\n\n" + errorInfo
+
+		if err := a.runPrompt(ctx, session, fullFeedback); err != nil {
+			return fmt.Errorf("checkpoint feedback prompt failed: %w", err)
+		}
+	}
+
+	return fmt.Errorf("checkpoint validation failed after %d attempts", maxRetries)
+}
+
 func (a *Analyser) runPrompt(ctx context.Context, session *agent.Session, prompt string) error {
 	turn, err := session.Prompt(ctx, wire.NewStringContent(prompt))
 	if err != nil {
