@@ -395,3 +395,81 @@ func TestServer_ToolsDescription(t *testing.T) {
 	// Server should have 2 tools defined
 	// This tests the tools() method indirectly
 }
+
+func TestServer_HandleToolCall_NoIndex(t *testing.T) {
+	// Create a server with NO index directory
+	tmpDir := t.TempDir()
+	t.Cleanup(internal.CloseHistoryLogger)
+
+	server := mcp.NewServer(tmpDir)
+	t.Cleanup(func() { server.Close() })
+
+	// Index should not exist
+	assert.False(t, server.IndexExistsForTest())
+
+	// Send a tool call request — should get isError with helpful message
+	toolCallParams := map[string]interface{}{
+		"name":      "memo_list_keys",
+		"arguments": map[string]interface{}{"path": "[arch]"},
+	}
+	paramsJSON, err := json.Marshal(toolCallParams)
+	require.NoError(t, err)
+
+	req := &mcp.Request{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "tools/call",
+		Params:  paramsJSON,
+	}
+
+	resp := server.HandleRequestForTest(req)
+	require.NotNil(t, resp)
+	assert.Nil(t, resp.Error, "Should not be a JSON-RPC error")
+
+	// The result should be a ToolCallResult with IsError true
+	resultJSON, err := json.Marshal(resp.Result)
+	require.NoError(t, err)
+
+	var toolResult mcp.ToolCallResult
+	require.NoError(t, json.Unmarshal(resultJSON, &toolResult))
+
+	assert.True(t, toolResult.IsError)
+	assert.Len(t, toolResult.Content, 1)
+	assert.Contains(t, toolResult.Content[0].Text, "memo scan")
+	assert.Contains(t, toolResult.Content[0].Text, "Index not found")
+}
+
+func TestServer_HandleToolCall_NoIndex_GetValue(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Cleanup(internal.CloseHistoryLogger)
+
+	server := mcp.NewServer(tmpDir)
+	t.Cleanup(func() { server.Close() })
+
+	toolCallParams := map[string]interface{}{
+		"name":      "memo_get_value",
+		"arguments": map[string]interface{}{"path": "[arch][modules]"},
+	}
+	paramsJSON, err := json.Marshal(toolCallParams)
+	require.NoError(t, err)
+
+	req := &mcp.Request{
+		JSONRPC: "2.0",
+		ID:      2,
+		Method:  "tools/call",
+		Params:  paramsJSON,
+	}
+
+	resp := server.HandleRequestForTest(req)
+	require.NotNil(t, resp)
+	assert.Nil(t, resp.Error)
+
+	resultJSON, err := json.Marshal(resp.Result)
+	require.NoError(t, err)
+
+	var toolResult mcp.ToolCallResult
+	require.NoError(t, json.Unmarshal(resultJSON, &toolResult))
+
+	assert.True(t, toolResult.IsError)
+	assert.Contains(t, toolResult.Content[0].Text, "Index not found")
+}

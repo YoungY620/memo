@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/YoungY620/memo/internal"
@@ -303,12 +304,30 @@ func (s *Server) handleRequest(req *Request) *Response {
 	}
 }
 
+// indexExists checks whether the index directory exists
+func (s *Server) indexExists() bool {
+	_, err := os.Stat(s.indexDir)
+	return err == nil
+}
+
 func (s *Server) handleToolCall(id any, params *ToolCallParams) *Response {
 	var args struct {
 		Path string `json:"path"`
 	}
 	if err := json.Unmarshal(params.Arguments, &args); err != nil {
 		return s.errorResponse(id, -32602, "Invalid arguments")
+	}
+
+	// Check if index exists before attempting to query
+	if !s.indexExists() {
+		return &Response{
+			JSONRPC: "2.0",
+			ID:      id,
+			Result: ToolCallResult{
+				Content: []ContentItem{{Type: "text", Text: "Index not found. Run 'memo scan' or 'memo watch' first to build the index."}},
+				IsError: true,
+			},
+		}
 	}
 
 	var result any
@@ -324,11 +343,15 @@ func (s *Server) handleToolCall(id any, params *ToolCallParams) *Response {
 	}
 
 	if err != nil {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "failed to parse") {
+			errMsg += "\nThe index file may be corrupted. Try running 'memo scan' to rebuild it."
+		}
 		return &Response{
 			JSONRPC: "2.0",
 			ID:      id,
 			Result: ToolCallResult{
-				Content: []ContentItem{{Type: "text", Text: err.Error()}},
+				Content: []ContentItem{{Type: "text", Text: errMsg}},
 				IsError: true,
 			},
 		}

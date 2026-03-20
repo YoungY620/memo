@@ -77,15 +77,13 @@ func TestMCPMode_NoIndex(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cmd := exec.Command(binary, "mcp", "-p", tmpDir)
+	// Close stdin immediately so the MCP server exits cleanly (EOF)
+	cmd.Stdin = strings.NewReader("")
 	output, err := cmd.CombinedOutput()
 
-	// Should fail because no index exists
-	if err == nil {
-		t.Error("MCP mode should fail without index directory")
-	}
-
-	if !strings.Contains(string(output), "index directory not found") {
-		t.Errorf("Should report missing index, got: %s", output)
+	// Server should start and exit cleanly (EOF on stdin), not crash
+	if err != nil {
+		t.Errorf("MCP mode should start without index directory, got error: %v, output: %s", err, output)
 	}
 }
 

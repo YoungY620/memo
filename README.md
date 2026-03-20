@@ -117,6 +117,48 @@ Memo exposes `.memo/index` to AI agents via MCP protocol:
 - `memo_list_keys` — List keys at a JSON path
 - `memo_get_value` — Get value at a JSON path
 
+### Quick Setup (auto-install)
+
+This config auto-installs memo on first use. No pre-installation required.
+
+**Linux / macOS:**
+```json
+{
+  "mcpServers": {
+    "memo": {
+      "command": "sh",
+      "args": ["-c", "eval \"$(curl -fsSL https://raw.githubusercontent.com/YoungY620/memo/main/run-mcp.sh 2>/dev/null || echo '')\""]
+    }
+  }
+}
+```
+
+**Windows (PowerShell):**
+```json
+{
+  "mcpServers": {
+    "memo": {
+      "command": "powershell",
+      "args": ["-Command", "& { try { iex (irm 'https://raw.githubusercontent.com/YoungY620/memo/main/run-mcp.ps1') } catch { if (Get-Command memo -ErrorAction SilentlyContinue) { & memo mcp @args } else { throw 'memo not found and install failed' } } }"]
+    }
+  }
+}
+```
+
+### Already Installed
+
+If memo is already installed and in your PATH:
+```json
+{
+  "mcpServers": {
+    "memo": {
+      "command": "memo",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
 ### Typical Workflow
 
 1. **Start watcher** (keeps index updated as you code):
@@ -124,23 +166,15 @@ Memo exposes `.memo/index` to AI agents via MCP protocol:
    cd /path/to/project && memo   # or: memo watch -p /path/to/project
    ```
 
-2. **Configure AI agent** to use memo MCP server. Example for Kimi CLI (`~/.kimi/mcp.json`):
-   ```json
-   {
-     "mcpServers": {
-       "memo": {
-         "command": "memo",
-         "args": ["mcp"]
-       }
-     }
-   }
-   ```
+2. **Configure AI agent** with one of the MCP configs above.
 
 3. **Query via agent**:
    ```bash
    kimi
    > Summarize this repo
    ```
+
+> **Note:** If the index hasn't been built yet, tool calls return a helpful error message suggesting to run `memo scan` or `memo watch` — the MCP server stays running and won't crash the agent.
 
 ## Entire.io Integration (Optional)
 
