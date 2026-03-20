@@ -19,7 +19,7 @@ Evaluated on a subset of [SWE-bench Lite](https://www.swebench.com/) (23 instanc
 
 [performance_analysis_final.png](performance_analysis_final.png)
 
-![overall pass rate](overall-passrate-improvement.png)
+<img src="overall-passrate-improvement.png" alt="overall pass rate" width="50%">
 
 **Key findings:**
 - **4× pass rate improvement** (4.3% → 17.4%)
